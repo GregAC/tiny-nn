@@ -104,7 +104,7 @@ module fp_add import tiny_nn_pkg::*; (
       if (mant_add[i]) begin
         mant_add_norm = mant_add_norm_all[i];
 
-        if (i < FPMantWidth) begin
+        if (i <= FPMantWidth) begin
           exp_change = $clog2(FPMantWidth)'(FPMantWidth - i);
         end
       end
