@@ -22,6 +22,10 @@ module fp_add_tb;
     $dumpfile("sim.fst");
     $dumpvars;
 
+    u_tester.add_test('{sgn: 1'b1, exp: 8'd103, mant: 7'b1001011},
+      '{sgn: 1'b1, exp: 8'd105, mant: 7'b0111101},
+      '{sgn: 1'b1, exp: 8'd105, mant: 7'b1101111});
+
     u_tester.add_test('{sgn: 1'b0, exp: 8'd127, mant: 7'd0},
       '{sgn: 1'b0, exp: 8'd127, mant: 7'd0},
       '{sgn: 1'b0, exp: 8'd128, mant: 7'd0});
