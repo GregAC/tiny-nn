@@ -17,7 +17,7 @@ module fp_add import tiny_nn_pkg::*; (
   logic [FPMantWidthExt-1:0]      op_x_full_mant_signed;
   logic signed [FPMantWidthExt-1:0]  foo;
   logic [FPMantWidthExt-1:0]      op_y_full_mant_signed_shifted;
-  logic [FPMantWidth-2:0]         op_y_dropped_bits;
+  logic [FPMantWidth-1:0]         op_y_dropped_bits;
   logic [FPExpWidth-1:0]          full_mant_shift;
   logic [$clog2(FPMantWidth)-1:0] mant_shift;
 
@@ -54,7 +54,7 @@ module fp_add import tiny_nn_pkg::*; (
 
   always_comb begin
     op_y_dropped_bits = '0;
-    for (int i = 0;i < FPMantWidth-1; ++i) begin
+    for (int i = 0;i < FPMantWidth; ++i) begin
       if (mant_shift >= ($clog2(FPMantWidth))'(i + 1)) begin
         op_y_dropped_bits[i] = op_y_full_mant_signed[i];
       end
