@@ -22,6 +22,10 @@ module fp_mul_tb;
     $dumpfile("sim.fst");
     $dumpvars;
 
+    u_tester.add_test('{sgn: 1'b0, exp: 8'd128, mant: 7'b1000000},
+      '{sgn: 1'b0, exp: 8'd127, mant: 7'b1000000},
+      '{sgn: 1'b0, exp: 8'd128, mant: 7'b0010000});
+
     u_tester.read_tests_from_file("./fp_mul_tests.hex");
 
     u_tester.run_tests(num_tests, failures);
