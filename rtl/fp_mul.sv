@@ -1,37 +1,37 @@
-module fp_mul #(
-  parameter int unsigned ExpWidth = 8,
-  parameter int unsigned MantWidth = 7
-)  (
-  input  logic [ExpWidth + MantWidth:0] op_a_i,
-  input  logic [ExpWidth + MantWidth:0] op_b_i,
-  output logic [ExpWidth + MantWidth:0] result_o
+module fp_mul import tiny_nn_pkg::*; (
+  input  fp_t op_a_i,
+  input  fp_t op_b_i,
+  output fp_t result_o
 );
-  logic [MantWidth:0]  op_a_mant, op_b_mant;
-  logic [ExpWidth-1:0] op_a_exp, op_b_exp;
+  logic [FPMantWidth:0] op_a_full_mant, op_b_full_mant;
 
-  logic [MantWidth*2+1:0] mant_mul;
-  logic [ExpWidth:0]      exp_add;
+  logic [FPMantWidth*2+1:0] mant_mul;
+  logic [FPExpWidth:0]      exp_add;
 
-  logic [MantWidth-1:0] result_mant;
-  logic [ExpWidth-1:0] result_exp;
+  logic [FPMantWidth-1:0] result_mant;
+  logic [FPExpWidth-1:0]  result_exp;
+  logic                   result_sgn;
 
   logic shift_output_mant;
 
-  assign op_a_mant = {1'b1, op_a_i[MantWidth-1:0]};
-  assign op_b_mant = {1'b1, op_b_i[MantWidth-1:0]};
+  assign op_a_full_mant = {1'b1, op_a_i.mant};
+  assign op_b_full_mant = {1'b1, op_b_i.mant};
 
-  assign op_a_exp = op_a_i[MantWidth + ExpWidth - 1:MantWidth];
-  assign op_b_exp = op_b_i[MantWidth + ExpWidth - 1:MantWidth];
+  assign mant_mul = op_a_full_mant * op_b_full_mant;
+  assign exp_add = op_a_i.exp + op_b_i.exp - {2'b01, {(FPExpWidth - 1){1'b0}}};
 
-  assign mant_mul = op_a_mant * op_b_mant;
-  assign exp_add = op_a_exp + op_b_exp - {2'b0, {(ExpWidth - 1){1'b1}}};
+  assign shift_output_mant = mant_mul[FPMantWidth*2+1];
 
-  assign shift_output_mant = mant_mul[MantWidth*2+1];
+  assign result_mant = shift_output_mant ? mant_mul[FPMantWidth*2:FPMantWidth+1] :
+                                           mant_mul[FPMantWidth*2-1:FPMantWidth];
 
-  assign result_mant = shift_output_mant ? mant_mul[MantWidth*2:MantWidth+1] :
-                                           mant_mul[MantWidth*2-1:MantWidth];
+  assign result_exp = shift_output_mant ? FPExpWidth'(exp_add + 1'b1) : exp_add[FPExpWidth-1:0];
 
-  assign result_exp = shift_output_mant ? ExpWidth'(exp_add + 1'b1) : exp_add[ExpWidth-1:0];
+  assign result_sgn = op_a_i.sgn ^ op_b_i.sgn;
 
-  assign result_o = {1'b0, result_exp, result_mant};
+  assign result_o = '{
+    sgn: result_sgn,
+    exp: result_exp,
+    mant: result_mant
+  };
 endmodule
