@@ -2,6 +2,8 @@ mod tnn_types;
 use rand::Rng;
 use std::fs::File;
 use std::io::Write;
+use std::io::BufWriter;
+use tqdm::tqdm;
 
 fn main() {
     //let test_fp16 = tnn_types::TinyNNFP16::new(false, 128, 0x40);
@@ -30,19 +32,17 @@ fn main() {
 
     let mut fp_add_tests_file = match File::create("fp_add_tests.hex") {
         Err(why) => panic!("couldn't open fp_add_tests.hex: {}", why),
-        Ok(file) => file
+        Ok(file) => BufWriter::new(file)
     };
 
     let mut fp_mul_tests_file = match File::create("fp_mul_tests.hex") {
         Err(why) => panic!("couldn't open fp_mul_tests.hex: {}", why),
-        Ok(file) => file
+        Ok(file) => BufWriter::new(file)
     };
 
-    for i in 0..1000 {
-        let num1 = tnn_types::TinyNNFP16::new(rng.gen(), rng.gen_range(100..160),rng.gen_range(0..128));
-        let num2 = tnn_types::TinyNNFP16::new(rng.gen(), rng.gen_range(100..160),rng.gen_range(0..128));
-        //let num1 = tnn_types::TinyNNFP16::new(false, 0x82, 0x21);
-        //let num2 = tnn_types::TinyNNFP16::new(false, 0x7b, 0x38);
+    for i in tqdm(0..10_000_000) {
+        let num1 = tnn_types::TinyNNFP16::new(rng.gen(), rng.gen_range(10..250),rng.gen_range(0..128));
+        let num2 = tnn_types::TinyNNFP16::new(rng.gen(), rng.gen_range(10..250),rng.gen_range(0..128));
 
         let mul_result = num1 * num2;
         let fp32_mul_result  = num1.to_f32() * num2.to_f32();
@@ -52,9 +52,9 @@ fn main() {
             println!("FAIL!");
             println!("Num1: {:e}, Num2: {:e}", num1.to_f32(), num2.to_f32());
             println!("Mul: {:e}, fp32_mul: {:e}", mul_result.to_f32(), fp32_mul_result);
-            println!("num1 s:{:}, e:{:x}, m:{:x}", num1.sgn(), num1.exp(), num1.mant());
-            println!("num2 s:{:}, e:{:x}, m:{:x}", num2.sgn(), num2.exp(), num2.mant());
-            println!("mul_result s:{:}, e:{:x}, m:{:x}", mul_result.sgn(), mul_result.exp(), mul_result.mant());
+            println!("num1 s:{:}, e:{}, m:{:x}", num1.sgn(), num1.exp(), num1.mant());
+            println!("num2 s:{:}, e:{}, m:{:x}", num2.sgn(), num2.exp(), num2.mant());
+            println!("mul_result s:{:}, e:{}, m:{:x}", mul_result.sgn(), mul_result.exp(), mul_result.mant());
         }
 
         write!(&mut fp_mul_tests_file, "{:04x}\n", num1.as_u16());
@@ -62,7 +62,7 @@ fn main() {
         write!(&mut fp_mul_tests_file, "{:04x}\n", mul_result.as_u16());
 
         let add_result = num1 + num2;
-        let fp32_add_result  = num1.to_f32() + num2.to_f32();
+        let fp32_add_result  = (num1.to_f32() + num2.to_f32()) as f32;
         if !add_result.f32_cmp(fp32_add_result) {
             failures += 1;
 
@@ -77,16 +77,15 @@ fn main() {
         write!(&mut fp_add_tests_file, "{:04x}\n", num1.as_u16());
         write!(&mut fp_add_tests_file, "{:04x}\n", num2.as_u16());
         write!(&mut fp_add_tests_file, "{:04x}\n", add_result.as_u16());
-
-        if ((i % 10_000) == 0) {
-            println!("{}", i);
-        }
     }
 
-
+    fp_add_tests_file.flush();
+    fp_mul_tests_file.flush();
 
     if failures == 0 {
         println!("PASS!");
+    } else {
+        println!("{} failures", failures);
     }
 }
 
