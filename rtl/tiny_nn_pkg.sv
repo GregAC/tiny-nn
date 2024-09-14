@@ -8,5 +8,28 @@ package tiny_nn_pkg;
     logic [FPMantWidth-1:0] mant;
   } fp_t;
 
-  parameter fp_t FPZero = '{sgn: 1'b0, exp: '0, mant: '0};
+  parameter fp_t FPZero   = '{sgn: 1'b0, exp: '0, mant: '0};
+  parameter fp_t FPStdNaN = '{sgn: 1'b1, exp: '1, mant: '1};
+  parameter fp_t FPPosInf = '{sgn: 1'b0, exp: '1, mant: '0};
+  parameter fp_t FPNegInf = '{sgn: 1'b1, exp: '1, mant: '0};
+
+  function bit is_nan(fp_t x);
+    if (x.exp == '0) begin
+      if (x.mant != '0) begin
+        return 1;
+      end else if (x.sgn == 1'b1) begin
+        return 1;
+      end else begin
+        return 0;
+      end
+    end else if (x.exp == '1) begin
+      if (x.mant != '0) begin
+        return 1;
+      end else begin
+        return 0;
+      end
+    end else begin
+      return 0;
+    end
+  endfunction
 endpackage

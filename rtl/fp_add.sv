@@ -117,10 +117,17 @@ module fp_add import tiny_nn_pkg::*; (
 
   assign result_mant = mant_add_norm[FPMantWidth-1:0];
 
-  assign result_o = mant_add_signed == '0 ? FPZero :
-                                            '{
-                                               sgn:  mant_add_sign,
-                                               exp:  result_exp,
-                                               mant: result_mant
-                                             };
+  always_comb begin
+    if (is_nan(op_a_i) || is_nan(op_b_i)) begin
+      result_o = FPStdNaN;
+    end else if (op_a_i == FPZero) begin
+      result_o = op_b_i;
+    end else if (op_b_i == FPZero) begin
+      result_o = op_a_i;
+    end else if (mant_add_signed == '0) begin
+      result_o = FPZero;
+    end else begin
+      result_o = '{sgn: mant_add_sign, exp: result_exp, mant: result_mant};
+    end
+  end
 endmodule
