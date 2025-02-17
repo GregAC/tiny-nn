@@ -120,11 +120,25 @@ module fp_add import tiny_nn_pkg::*; (
   always_comb begin
     if (is_nan(op_a_i) || is_nan(op_b_i)) begin
       result_o = FPStdNaN;
+    end else if (is_inf(op_a_i) && is_inf(op_b_i)) begin
+      if (op_a_i.sgn != op_b_i.sgn) begin
+        result_o = FPStdNaN;
+      end else begin
+        result_o = op_a_i;
+      end
+    end else if (is_inf(op_a_i)) begin
+      result_o = op_a_i;
+    end else if (is_inf(op_b_i)) begin
+      result_o = op_b_i;
     end else if (op_a_i == FPZero) begin
       result_o = op_b_i;
     end else if (op_b_i == FPZero) begin
       result_o = op_a_i;
     end else if (mant_add_signed == '0) begin
+      result_o = FPZero;
+    end else if (mant_add[FPMantWidth + 2] && op_x.exp == (FPPosInf.exp - 1'b1)) begin
+      result_o = mant_add_sign ? FPNegInf : FPPosInf;
+    end else if ((mant_add[FPMantWidth + 1 +: 2] == '0) && ((1'b1 + FPExpWidth'(exp_change)) >= op_x.exp)) begin
       result_o = FPZero;
     end else begin
       result_o = '{sgn: mant_add_sign, exp: result_exp, mant: result_mant};

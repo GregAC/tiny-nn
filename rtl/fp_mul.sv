@@ -38,6 +38,8 @@ module fp_mul import tiny_nn_pkg::*; (
       result_o = FPStdNaN;
     end else if ((op_a_i == FPZero) || (op_b_i == FPZero)) begin
       result_o = FPZero;
+    end else if (is_inf(op_a_i) || is_inf(op_b_i)) begin
+      result_o = result_sgn ? FPNegInf : FPPosInf;
     end else if (exp_add_raw <= {2'b00, {(FPExpWidth - 1){1'b1}}}) begin
       result_o = FPZero;
     end else if (exp_add >= {1'b0, {(FPExpWidth){1'b1}}}) begin
