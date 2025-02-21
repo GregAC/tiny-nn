@@ -36,4 +36,6 @@ package tiny_nn_pkg;
   function bit is_inf(fp_t x);
     return x == FPPosInf || x == FPNegInf;
   endfunction
+
+  parameter logic [3:0] CmdOpConvolve = 4'h1;
 endpackage
