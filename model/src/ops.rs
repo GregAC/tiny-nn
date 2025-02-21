@@ -1,5 +1,5 @@
 const ConvWidth: usize = 4;
-const ConvHeight: usize = 4;
+const ConvHeight: usize = 2;
 
 use super::tnn_types::{TinyNNFP16, TinyNNFP16Zero};
 use ndarray::{s, Array2, ArrayView, Ix2};
@@ -69,15 +69,15 @@ pub fn do_accumulate(
     let mut cur_value_idx = 0;
 
     for v in in_values {
-        cur_accum = cur_accum + v;
+        cur_accum = cur_accum + *v;
         cur_value_idx += 1;
 
         if cur_value_idx == values_per_accum {
-            if relu && cur_accum.sgn {
-                cur_accum = 0;
-            } else {
-                out_values.push(cur_accum);
+            if relu && cur_accum.sgn() {
+                cur_accum = TinyNNFP16Zero;
             }
+
+            out_values.push(cur_accum);
 
             cur_accum = bias;
             cur_value_idx = 0;

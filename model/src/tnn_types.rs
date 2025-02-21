@@ -32,8 +32,6 @@ impl TinyNNFP16 {
         let exp = unsigned_fp.log2().floor();
         let mant = (unsigned_fp / exp.exp2()) * (TNNFP16MantWidth as f32).exp2();
 
-        println!("Got {:} {:} {:}", exp, mant, sgn);
-
         TinyNNFP16::new(
             sgn,
             (exp as i16 + TNNFP16Bias as i16) as u16,
