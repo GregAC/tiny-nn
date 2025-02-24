@@ -1,5 +1,5 @@
-const ConvWidth: usize = 4;
-const ConvHeight: usize = 2;
+pub const ConvWidth: usize = 4;
+pub const ConvHeight: usize = 2;
 
 use super::tnn_types::{TinyNNFP16, TinyNNFP16Zero};
 use ndarray::{s, Array2, ArrayView, Ix2};
@@ -81,24 +81,6 @@ pub fn do_accumulate(
 
             cur_accum = bias;
             cur_value_idx = 0;
-        }
-    }
-
-    return out_values;
-}
-
-pub fn input_conv_stream_from_image(
-    image: &Vec<TinyNNFP16>,
-    start_x: usize,
-    end_x: usize,
-    y: usize,
-    height: usize,
-) -> Vec<TinyNNFP16> {
-    let mut out_values: Vec<TinyNNFP16> = Vec::new();
-
-    for x in start_x..end_x {
-        for inner_y in 0..ConvHeight {
-            out_values.push(image[x * height + (y + inner_y)]);
         }
     }
 
