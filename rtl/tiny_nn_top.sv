@@ -57,7 +57,7 @@ module tiny_nn_top import tiny_nn_pkg::*; #(
         end
       end
       NNConvolveExec: begin
-        phase_d      = ~phase_d;
+        phase_d      = ~phase_q;
         convolve_run = 1'b1;
 
         if (phase_q) begin
