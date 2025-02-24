@@ -1,7 +1,7 @@
 module tiny_nn_top import tiny_nn_pkg::*; #(
   parameter int unsigned CountWidth     = 12,
+  // Design assumes val array is 4x2! Changing this will break the design.
   parameter int unsigned ValArrayWidth  = 4,
-  // Design assumes this is 2! Will break if it is changed
   parameter int unsigned ValArrayHeight = 2
 ) (
   input clk_i,
@@ -88,14 +88,15 @@ module tiny_nn_top import tiny_nn_pkg::*; #(
 
   logic [ValArrayHeight-1:0] core_val_shift;
   logic                      core_mul_row_sel, core_mul_en;
-  logic                      core_accumulate_en;
+  logic [1:0]                core_accumulate_en;
   fp_t                       core_accumulate_result;
 
-  assign core_val_shift[0]  = ~phase_q & convolve_run;
-  assign core_val_shift[1]  =  phase_q & convolve_run;
-  assign core_mul_row_sel   =  phase_q;
-  assign core_mul_en        =  convolve_run;
-  assign core_accumulate_en =  phase_q & convolve_run;
+  assign core_val_shift[0]     = ~phase_q & convolve_run;
+  assign core_val_shift[1]     =  phase_q & convolve_run;
+  assign core_mul_row_sel      =  phase_q;
+  assign core_mul_en           =  convolve_run;
+  assign core_accumulate_en[0] =  convolve_run;
+  assign core_accumulate_en[1] =  phase_q & convolve_run;
 
   tiny_nn_core #(
     .ValArrayWidth(ValArrayWidth),
@@ -122,8 +123,8 @@ module tiny_nn_top import tiny_nn_pkg::*; #(
 
     case (state_q)
       NNConvolveExec: begin
-        data_o = phase_q ? core_accumulate_result[7:0] :
-                           core_accumulate_result[15:8];
+        data_o = phase_q ? core_accumulate_result[15:8] :
+                           core_accumulate_result[7:0];
       end
       default: ;
     endcase
