@@ -19,41 +19,65 @@ module tiny_nn_top_tb;
     end
   end
 
-  logic [15:0] test_vals [16];
-  logic [31:0] counter;
+  logic [15:0] test_vals[$];
+
+  logic [15:0] test_data_in;
+  logic [7:0]  data_out;
 
   initial begin
+    integer test_file;
+    string  test_filename;
+
+    integer out_file;
+    string  out_filename;
+
+
+    if (!$value$plusargs("test_data=%s", test_filename)) begin
+      $display("No +test_data argument provided");
+      $finish();
+    end
+
+    if (!$value$plusargs("out=%s", out_filename)) begin
+      $display("No +out argument provided");
+      $finish();
+    end
+
+    test_file = $fopen(test_filename, "r");
+    if (test_file == 0) begin
+      $display("Error opening %s", test_filename);
+      $finish();
+    end
+
+    out_file = $fopen(out_filename, "w");
+    if (out_file == 0) begin
+      $display("Error opening %s", out_filename);
+      $finish();
+    end
+
     $dumpfile("sim.fst");
     $dumpvars;
 
-    $readmemh("test_image.hex", test_vals);
-  end
+    while (!$feof(test_file)) begin
+      bit [15:0] val;
 
-  always_ff @(posedge clk or negedge rst_n) begin
-    if (!rst_n) begin
-      counter <= '0;
-    end else begin
-      counter <= counter + 32'd1;
+      $fscanf(test_file, "%x\n", val);
+      test_vals.push_back(val);
     end
-  end
 
-  logic [15:0] test_data_in;
-
-  always_comb begin
     test_data_in = '0;
-    if (counter == 32'd5) begin
-      test_data_in = {tiny_nn_pkg::CmdOpConvolve, 12'd32};
-    end else if(counter >= 32'd6 && counter < 32'd14) begin
-      test_data_in = 16'h3f00;
-    end else begin
-      if (counter < 32'd30) begin
-        test_data_in = test_vals[counter - 14];
-      end else if (counter < 32'd100) begin
-        test_data_in = tiny_nn_pkg::FPZero;
-      end else begin
-        $finish();
-      end
+    @(posedge clk);
+    @(posedge clk);
+    @(posedge clk);
+
+    foreach (test_vals[i]) begin
+      test_data_in = test_vals[i];
+      @(posedge clk);
+      $fwrite(out_file, "%02x\n", data_out);
     end
+
+    $fclose(test_file);
+    $fclose(out_file);
+    $finish();
   end
 
   tiny_nn_top dut (
@@ -61,6 +85,6 @@ module tiny_nn_top_tb;
     .rst_ni(rst_n),
 
     .data_i(test_data_in),
-    .data_o()
+    .data_o(data_out)
   );
 endmodule
