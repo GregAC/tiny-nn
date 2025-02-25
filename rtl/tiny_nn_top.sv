@@ -1,5 +1,5 @@
 module tiny_nn_top import tiny_nn_pkg::*; #(
-  parameter int unsigned CountWidth     = 12,
+  parameter int unsigned CountWidth     = 8,
   // Design assumes val array is 4x2! Changing this will break the design.
   parameter int unsigned ValArrayWidth  = 4,
   parameter int unsigned ValArrayHeight = 2
@@ -20,7 +20,8 @@ module tiny_nn_top import tiny_nn_pkg::*; #(
   typedef enum logic [2:0] {
     NNIdle            = 0,
     NNConvolveParamIn = 1,
-    NNConvolveExec    = 2
+    NNConvolveExec    = 2,
+    NNConvolveExecEnd = 3
   } state_e;
 
   state_e state_q, state_d;
@@ -37,7 +38,6 @@ module tiny_nn_top import tiny_nn_pkg::*; #(
         case (data_i[15:12])
           CmdOpConvolve: begin
             state_d   = NNConvolveParamIn;
-            counter_d = data_i[CountWidth-1:0];
 
             param_write_d    = '0;
             param_write_d[0] = 1'b1;
@@ -55,11 +55,16 @@ module tiny_nn_top import tiny_nn_pkg::*; #(
           param_write_d = {param_write_q[ValArraySize-2:0], 1'b0};
         end
       end
-      NNConvolveExec: begin
+      NNConvolveExec, NNConvolveExecEnd: begin
         phase_d      = ~phase_q;
         convolve_run = 1'b1;
 
-        if (phase_q) begin
+        if (state_q == NNConvolveExec) begin
+          if (data_i == FPStdNaN) begin
+            state_d = NNConvolveExecEnd;
+            counter_d = 8'd4;
+          end
+        end else begin
           if (counter_q != '0) begin
             counter_d = counter_q - 1'b1;
           end else begin
@@ -121,7 +126,7 @@ module tiny_nn_top import tiny_nn_pkg::*; #(
     data_o = '1;
 
     case (state_q)
-      NNConvolveExec: begin
+      NNConvolveExec, NNConvolveExecEnd: begin
         data_o = phase_q ? core_accumulate_result[15:8] :
                            core_accumulate_result[7:0];
       end
