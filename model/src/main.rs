@@ -83,8 +83,8 @@ fn create_add_mul_tests() {
 }
 
 fn main() {
-    let test_image = test_data::get_mnist_image();
-    let test_params = test_data::get_mnist_convolve_0_params();
+    let test_image = test_data::get_incrementing_test_image();
+    let test_params = test_data::get_half_const_convolve_params();
 
     let conv_result = utils::conv_image(&test_image, &test_params);
 
@@ -106,11 +106,12 @@ fn main() {
         Ok(file) => BufWriter::new(file),
     };
 
-    utils::write_fp_vec_to_file(&test_params.flatten().to_vec(), &mut test_file);
-    utils::write_fp_vec_to_file(
-        &utils::input_conv_stream_from_image(&test_image),
-        &mut test_file,
-    );
+
+    let test_input_stream = utils::full_conv_stream(&utils::input_conv_stream_from_image(&test_image), &test_params);
+
+    for x in test_input_stream {
+        write!(test_file, "{:04x}\n", x);
+    }
 
     let expected_output = utils::output_stream_from_conv_image(&conv_result);
 

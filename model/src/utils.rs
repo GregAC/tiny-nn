@@ -1,11 +1,13 @@
 use super::ops::{do_convolve, ConvHeight, ConvWidth};
-use super::tnn_types::{TinyNNFP16, TinyNNFP16Zero};
+use super::tnn_types::{TinyNNFP16, TinyNNFP16Zero, TinyNNFP16StdNaN};
 use ndarray::{s, Array1, Array2};
 use std::io;
 
 // 8 cycles for parameters, then 12 cycles for first valid convolve result
 const ConvFirstOutputDelay: usize = 12 + 8;
 const ConvRowOutputDelay: usize = 6;
+
+const TNNCmdOpConvolve: u16 = 1 << 12;
 
 pub fn conv_stream_from_image_row(
     image: &Array2<TinyNNFP16>,
@@ -92,4 +94,14 @@ pub fn write_output_stream(output_stream: &Vec<Option<u8>>, writer: &mut dyn io:
             write!(writer, "X\n");
         }
     }
+}
+
+pub fn full_conv_stream(conv_image_stream: &Vec<TinyNNFP16>, params: &Array2<TinyNNFP16>) -> Vec<u16> {
+    let mut output: Vec<u16> = vec![TNNCmdOpConvolve];
+
+    output.extend(params.flatten().to_vec().iter().map(|x| x.as_u16()));
+    output.extend(conv_image_stream.iter().map(|x| x.as_u16()));
+    output.push(TinyNNFP16StdNaN.as_u16());
+
+    return output;
 }
