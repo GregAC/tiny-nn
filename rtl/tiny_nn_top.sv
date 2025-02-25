@@ -28,7 +28,7 @@ module tiny_nn_top import tiny_nn_pkg::*; #(
   always_comb begin
     state_d       = state_q;
     counter_d     = counter_q;
-    phase_d       = phase_q;
+    phase_d       = 1'b0;
     param_write_d = param_write_q;
     convolve_run  = 1'b0;
 
@@ -53,7 +53,6 @@ module tiny_nn_top import tiny_nn_pkg::*; #(
         end else begin
           // Move to next parameter for write
           param_write_d = {param_write_q[ValArraySize-2:0], 1'b0};
-          phase_d = 1'b0;
         end
       end
       NNConvolveExec: begin
