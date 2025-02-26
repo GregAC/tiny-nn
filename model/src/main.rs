@@ -82,11 +82,11 @@ fn create_add_mul_tests() {
     }
 }
 
-fn main() {
-    let test_image = test_data::get_incrementing_test_image();
-    let test_params = test_data::get_half_const_convolve_params();
+fn gen_convolve() {
+    let test_image = test_data::get_mnist_image();
+    let test_params = test_data::get_mnist_convolve_0_params();
 
-    let conv_result = utils::conv_image(&test_image, &test_params);
+    let conv_result = utils::conv_image(&test_image, &test_params, 0, 0);
 
     for y in 0..conv_result.shape()[1] {
         for x in 0..conv_result.shape()[0] {
@@ -121,4 +121,106 @@ fn main() {
     };
 
     utils::write_output_stream(&expected_output, &mut expected_output_file);
+}
+
+fn gen_accumulate() {
+    let test_nums = vec![
+        TinyNNFP16::from_f32(0.25),
+        TinyNNFP16::from_f32(0.5),
+        TinyNNFP16::from_f32(0.75),
+        TinyNNFP16::from_f32(1.0),
+
+        TinyNNFP16::from_f32(1.25),
+        TinyNNFP16::from_f32(1.5),
+        TinyNNFP16::from_f32(1.75),
+        TinyNNFP16::from_f32(2.0),
+
+        TinyNNFP16::from_f32(2.25),
+        TinyNNFP16::from_f32(2.5),
+        TinyNNFP16::from_f32(2.75),
+        TinyNNFP16::from_f32(3.0),
+
+        TinyNNFP16::from_f32(3.25),
+        TinyNNFP16::from_f32(3.5),
+        TinyNNFP16::from_f32(3.75),
+        TinyNNFP16::from_f32(4.0),
+    ];
+
+    let test_accumulate = ops::do_accumulate(&test_nums, 2, TinyNNFP16::from_f32(-4.0), true);
+
+    for v in &test_accumulate {
+        println!("{} {:04x} {:02x} {:02x}", v.to_f32(), v.as_u16(), v.mant(), v.exp());
+    }
+
+    let mut test_file = match File::create("test_vec.hex") {
+        Err(why) => panic!("couldn't open test_vec.hex: {}", why),
+        Ok(file) => BufWriter::new(file),
+    };
+
+
+    let test_input_stream = utils::full_accum_stream(&test_nums, 2, TinyNNFP16::from_f32(-4.0), true);
+
+    for x in test_input_stream {
+        write!(test_file, "{:04x}\n", x);
+    }
+
+    let expected_output = utils::output_stream_from_accum_result(&test_accumulate, 2);
+
+    let mut expected_output_file = match File::create("expected_out.hex") {
+        Err(why) => panic!("couldn't open expected_out.hex: {}", why),
+        Ok(file) => BufWriter::new(file),
+    };
+
+    utils::write_output_stream(&expected_output, &mut expected_output_file);
+}
+
+fn gen_accumulate2() {
+    let test_image = test_data::get_mnist_image();
+    let test_params1 = test_data::get_mnist_convolve_0_params();
+    let test_params2 = test_data::get_mnist_convolve_1_params();
+
+    let conv_result1 = utils::conv_image(&test_image, &test_params1, 0, 2);
+    let conv_result2 = utils::conv_image(&test_image, &test_params2, 2, 0);
+
+    let mut full_interleave: Vec<TinyNNFP16> = Vec::new();
+    let full_accum: Vec<TinyNNFP16> = Vec::new();
+
+    let convolve_bias = TinyNNFP16::from_f32(-0.5370);
+
+    for y in 0..11 {
+        let interleaved = itertools::interleave(conv_result1.slice(s![.., y]).into_iter(),
+            conv_result2.slice(s![.., y]).into_iter()).cloned().collect::<Vec<_>>();
+
+        full_interleave.extend(interleaved);
+    }
+
+    let test_accumulate = ops::do_accumulate(&full_interleave, 2, convolve_bias, true);
+
+    for v in &test_accumulate {
+        println!("{} {:04x} {:02x} {:02x}", v.to_f32(), v.as_u16(), v.mant(), v.exp());
+    }
+
+    let mut test_file = match File::create("test_vec.hex") {
+        Err(why) => panic!("couldn't open test_vec.hex: {}", why),
+        Ok(file) => BufWriter::new(file),
+    };
+
+    let test_input_stream = utils::full_accum_stream(&full_interleave, 2, convolve_bias, true);
+
+    for x in test_input_stream {
+        write!(test_file, "{:04x}\n", x);
+    }
+
+    let expected_output = utils::output_stream_from_accum_result(&test_accumulate, 2);
+
+    let mut expected_output_file = match File::create("expected_out.hex") {
+        Err(why) => panic!("couldn't open expected_out.hex: {}", why),
+        Ok(file) => BufWriter::new(file),
+    };
+
+    utils::write_output_stream(&expected_output, &mut expected_output_file);
+}
+
+fn main() {
+    gen_convolve();
 }

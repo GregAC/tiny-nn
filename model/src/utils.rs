@@ -6,8 +6,10 @@ use std::io;
 // 8 cycles for parameters, then 12 cycles for first valid convolve result
 const ConvFirstOutputDelay: usize = 12 + 8;
 const ConvRowOutputDelay: usize = 6;
+const AccumFirstOutputDelay: usize = 2;
 
 const TNNCmdOpConvolve: u16 = 1 << 12;
+const TNNCmdOpAccumulate: u16 = 2 << 12;
 
 pub fn conv_stream_from_image_row(
     image: &Array2<TinyNNFP16>,
@@ -40,15 +42,15 @@ pub fn input_conv_stream_from_image(image: &Array2<TinyNNFP16>) -> Vec<TinyNNFP1
     return out;
 }
 
-pub fn conv_image(image: &Array2<TinyNNFP16>, params: &Array2<TinyNNFP16>) -> Array2<TinyNNFP16> {
+pub fn conv_image(image: &Array2<TinyNNFP16>, params: &Array2<TinyNNFP16>, y_offset_start: usize, y_offset_end: usize) -> Array2<TinyNNFP16> {
     let conv_result_width = image.shape()[0] - (ConvWidth - 1);
-    let conv_result_height = image.shape()[1] - (ConvHeight - 1);
+    let conv_result_height = image.shape()[1] - (ConvHeight - 1) - y_offset_end - y_offset_start;
 
     let mut result =
         Array2::<TinyNNFP16>::from_elem((conv_result_width, conv_result_height), TinyNNFP16Zero);
 
     for y in 0..conv_result_height {
-        let conv_stream = conv_stream_from_image_row(image, 0, image.shape()[0], y);
+        let conv_stream = conv_stream_from_image_row(image, 0, image.shape()[0], y + y_offset_start);
         let accum_result = Array1::from_vec(do_convolve(&conv_stream, params));
 
         result.slice_mut(s![.., y]).assign(&accum_result);
@@ -102,6 +104,30 @@ pub fn full_conv_stream(conv_image_stream: &Vec<TinyNNFP16>, params: &Array2<Tin
     output.extend(params.flatten().to_vec().iter().map(|x| x.as_u16()));
     output.extend(conv_image_stream.iter().map(|x| x.as_u16()));
     output.push(TinyNNFP16StdNaN.as_u16());
+
+    return output;
+}
+
+pub fn full_accum_stream(accum_values: &Vec<TinyNNFP16>, values_per_accum: usize, bias: TinyNNFP16, relu: bool) -> Vec<u16> {
+    let relu_flag: u16 = if relu {0x100} else {0x0};
+    let mut output: Vec<u16> = vec![TNNCmdOpAccumulate | relu_flag | (((values_per_accum - 1) & 0xff) as u16)];
+
+    output.push(bias.as_u16());
+    output.extend(accum_values.iter().map(|x| x.as_u16()));
+    output.push(TinyNNFP16StdNaN.as_u16());
+
+    return output;
+}
+
+pub fn output_stream_from_accum_result(accum_result: &Vec<TinyNNFP16>, values_per_accum: usize) -> Vec<Option<u8>> {
+    let mut output: Vec<Option<u8>> = vec![None; AccumFirstOutputDelay + 2];
+
+    for v in accum_result {
+        output.extend(vec![None; values_per_accum - 2]);
+        let v_16 = v.as_u16();
+        output.push(Some((v_16 & 0xff) as u8));
+        output.push(Some((v_16 >> 8) as u8));
+    }
 
     return output;
 }
