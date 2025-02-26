@@ -14,6 +14,12 @@ module tiny_nn_core import tiny_nn_pkg::*; #(
   input logic mul_row_sel_i,
   input logic mul_en_i,
 
+  input logic accumulate_loopback_i,
+  input logic accumulate_out_relu_i,
+
+  input fp_t                 accumulate_level_1_direct_din_i,
+  input [ValArrayHeight-1:0] accumulate_level_1_direct_en_i,
+
   input logic [1:0] accumulate_en_i,
   output fp_t accumulate_o
 );
@@ -84,30 +90,57 @@ module tiny_nn_core import tiny_nn_pkg::*; #(
     end
   end
 
-  fp_t accumulate_level_1_q[ValArrayHeight];
-  fp_t accumulate_level_1_d;
+  fp_t                       accumulate_level_0_result;
+  fp_t                       accumulate_level_1_q[ValArrayHeight];
+  fp_t                       accumulate_level_1_d[ValArrayHeight];
+  logic [ValArrayHeight-1:0] accumulate_level_1_en;
 
   fp_add u_add (
     .op_a_i(accumulate_level_0_q[0]),
     .op_b_i(accumulate_level_0_q[1]),
-    .result_o(accumulate_level_1_d)
+    .result_o(accumulate_level_0_result)
   );
 
   for (genvar y = 0;y < ValArrayHeight; ++y) begin
+    assign accumulate_level_1_en[y] =
+        (accumulate_en_i[0] & (mul_row_sel_i == y)) | accumulate_level_1_direct_en_i[y];
+
+    assign accumulate_level_1_d[y] =
+        accumulate_level_1_direct_en_i[y] ? accumulate_level_1_direct_din_i :
+                                            accumulate_level_0_result;
+
     always_ff @(posedge clk_i) begin
-      if (accumulate_en_i[0] && (y == mul_row_sel_i)) begin
-        accumulate_level_1_q[y] <= accumulate_level_1_d;
+      if (accumulate_level_1_en[y]) begin
+        accumulate_level_1_q[y] <= accumulate_level_1_d[y];
       end
     end
   end
 
-  fp_t accumulate_final_q, accumulate_final_d;
+  logic [15:0] accumulate_final_op_a, accumulate_final_op_b;
+
+  always_comb begin
+    accumulate_final_op_a = accumulate_level_1_q[0];
+  end
+
+  always_comb begin
+    accumulate_final_op_b = accumulate_loopback_i ? accumulate_final_q : accumulate_level_1_q[1];
+  end
+
+  fp_t accumulate_final_q, accumulate_final_d, accumulate_final_result;
 
   fp_add u_add_accumulate_final (
-    .op_a_i(accumulate_level_1_q[0]),
-    .op_b_i(accumulate_level_1_q[1]),
-    .result_o(accumulate_final_d)
+    .op_a_i(accumulate_final_op_a),
+    .op_b_i(accumulate_final_op_b),
+    .result_o(accumulate_final_result)
   );
+
+  always_comb begin
+    accumulate_final_d = accumulate_final_result;
+
+    if (accumulate_out_relu_i && accumulate_final_result.sgn) begin
+      accumulate_final_d = FPZero;
+    end
+  end
 
   always_ff @(posedge clk_i) begin
     if (accumulate_en_i[1]) begin
