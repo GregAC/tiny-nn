@@ -67,15 +67,17 @@ module tiny_nn_top_tb;
     end
 
     test_data_in = '0;
-    repeat(3) @(posedge clk);
 
+    repeat(3) @(posedge clk);
 
     // TODO: Tidy up output into `out_file`. Need to manually replicate the $fwrite calls below in
     // the wait for idle and simulation exit. Better to have a separate process that just writes out
     // to the file every clock until stopped.
     foreach (test_vals[i]) begin
+      #1;
       test_data_in = test_vals[i];
       @(posedge clk);
+      #1;
       $fwrite(out_file, "%02x\n", data_out);
     end
 
@@ -83,9 +85,10 @@ module tiny_nn_top_tb;
 
     forever begin
       @(posedge clk);
+      #1;
       $fwrite(out_file, "%02x\n", data_out);
 
-      if (dut.state_q != dut.NNIdle) begin
+      if (dut.state_q != 0) begin
         idle_wait_count++;
       end else begin
         break;
