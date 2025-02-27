@@ -1,5 +1,4 @@
 module tiny_nn_top import tiny_nn_pkg::*; #(
-  parameter int unsigned CountWidth     = 8,
   // Design assumes val array is 4x2! Changing this will break the design.
   parameter int unsigned ValArrayWidth  = 4,
   parameter int unsigned ValArrayHeight = 2
@@ -11,6 +10,7 @@ module tiny_nn_top import tiny_nn_pkg::*; #(
   output logic [7:0]  data_o
 );
   localparam int unsigned ValArraySize = ValArrayWidth * ValArrayHeight;
+  localparam int unsigned CountWidth   = 8;
 
   logic                    phase_q, phase_d;
   logic [CountWidth-1:0]   counter_q, counter_d;
@@ -25,14 +25,17 @@ module tiny_nn_top import tiny_nn_pkg::*; #(
   logic [1:0]              accumulate_level_1_direct_en;
 
   typedef enum logic [3:0] {
-    NNIdle               = 0,
-    NNConvolveParamIn    = 1,
-    NNConvolveExec       = 2,
-    NNConvolveExecEnd    = 3,
-    NNAccumulateBiasIn   = 4,
-    NNAccumulateExec     = 5,
-    NNAccumulateExecEnd1 = 6,
-    NNAccumulateExecEnd2 = 7
+    NNIdle               = 4'h0,
+    NNConvolveParamIn    = 4'h1,
+    NNConvolveExec       = 4'h2,
+    NNConvolveExecEnd    = 4'h3,
+    NNAccumulateBiasIn   = 4'h4,
+    NNAccumulateExec     = 4'h5,
+    NNAccumulateExecEnd1 = 4'h6,
+    NNAccumulateExecEnd2 = 4'h7,
+    NNTestCount          = 4'hd,
+    NNTestPulse          = 4'he,
+    NNTestASCII          = 4'hf
   } state_e;
 
   state_e state_q, state_d;
@@ -67,6 +70,23 @@ module tiny_nn_top import tiny_nn_pkg::*; #(
             state_d = NNAccumulateBiasIn;
 
             relu_d = data_i[8];
+          end
+          CmdOpTest: begin
+            case (data_i[11:8])
+              4'hf: begin
+                state_d   = NNTestASCII;
+                counter_d = 8'd4;
+              end
+              4'h1: begin
+                state_d   = NNTestCount;
+                counter_d = data_i[CountWidth-1:0];
+              end
+              4'h0: begin
+                state_d   = NNTestPulse;
+                counter_d = 8'd1;
+              end
+              default: ;
+            endcase
           end
           default: ;
         endcase
@@ -128,6 +148,31 @@ module tiny_nn_top import tiny_nn_pkg::*; #(
       end
       NNAccumulateExecEnd2: begin
         state_d = NNIdle;
+      end
+      NNTestASCII: begin
+        if (data_i[15:8] == 8'hff) begin
+          if (counter_q == 0) begin
+            counter_d = 8'd4;
+          end else begin
+            counter_d = counter_q - 1'b1;
+          end
+        end else begin
+          state_d = NNIdle;
+        end
+      end
+      NNTestPulse: begin
+        if (data_i[15:8] == 8'hf0) begin
+          counter_d = counter_q - 1'b1;
+        end else begin
+          state_d = NNIdle;
+        end
+      end
+      NNTestCount: begin
+        if (counter_q == '0) begin
+          state_d = NNIdle;
+        end else begin
+          counter_d = counter_q - 1'b1;
+        end
       end
       default: ;
     endcase
@@ -197,6 +242,31 @@ module tiny_nn_top import tiny_nn_pkg::*; #(
     end
   end
 
+  logic [7:0] test_out;
+
+  always_comb begin
+    test_out = '0;
+
+    case (state_q)
+      NNTestASCII: begin
+        case (counter_q)
+          8'd3, 8'd4: test_out = 8'h54;
+          8'd2:       test_out = 8'h2d;
+          8'd0, 8'd1: test_out = 8'h4e;
+          default:    test_out = '0;
+        endcase
+      end
+      NNTestPulse: begin
+        test_out = counter_q[0] ? 8'b1010_1010 :
+                                  8'b0101_0101;
+      end
+      NNTestCount: begin
+        test_out = counter_q;
+      end
+      default: ;
+    endcase
+  end
+
   always_comb begin
     data_o = '1;
 
@@ -217,6 +287,9 @@ module tiny_nn_top import tiny_nn_pkg::*; #(
       end
       NNAccumulateExecEnd2: begin
         data_o = core_result_skid_q;
+      end
+      NNTestASCII, NNTestPulse, NNTestCount: begin
+        data_o = test_out;
       end
       default: ;
     endcase

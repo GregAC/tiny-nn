@@ -39,4 +39,5 @@ package tiny_nn_pkg;
 
   parameter logic [3:0] CmdOpConvolve   = 4'h1;
   parameter logic [3:0] CmdOpAccumulate = 4'h2;
+  parameter logic [3:0] CmdOpTest       = 4'hf;
 endpackage
