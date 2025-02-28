@@ -36,6 +36,7 @@ def compare_simulation_with_model(simulation_output_path, expected_output_path):
         with open(simulation_output_path, 'r') as sim_file, open(expected_output_path, 'r') as model_file:
             sim_lines = sim_file.readlines()
             model_lines = model_file.readlines()
+            concrete_matches = 0
 
             # Check if expected output is longer than simulation output (error condition)
             if len(model_lines) > len(sim_lines):
@@ -63,6 +64,8 @@ def compare_simulation_with_model(simulation_output_path, expected_output_path):
                     if model_byte.lower() != sim_byte.lower():
                         print(f"Mismatch at byte {i+1}: Simulation produced '{sim_byte}', model expected '{model_byte}'")
                         return False
+
+                    concrete_matches += 1
                 else:
                     print(f"Error at byte {i+1} in expected output: '{model_byte}' is neither a valid 2-digit hex value nor 'X'")
                     print("Expected output should only contain 2-digit hex values (00-FF) or 'X' wildcards")
@@ -75,7 +78,7 @@ def compare_simulation_with_model(simulation_output_path, expected_output_path):
 
             print("Verification successful: Hardware simulation output matches "
                   "the expected pattern from software model "
-                  f"{len(model_lines)} bytes matched")
+                  f"{concrete_matches} bytes matched / {len(model_lines)} bytes total")
             return True
 
     except FileNotFoundError as e:
