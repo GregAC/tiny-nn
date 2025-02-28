@@ -6,7 +6,7 @@ use std::io;
 // 8 cycles for parameters, then 12 cycles for first valid convolve result
 const ConvFirstOutputDelay: usize = 12 + 8;
 const ConvRowOutputDelay: usize = 6;
-const AccumFirstOutputDelay: usize = 2;
+const AccumFirstOutputDelay: usize = 3;
 
 const TNNCmdOpConvolve: u16 = 1 << 12;
 const TNNCmdOpAccumulate: u16 = 2 << 12;

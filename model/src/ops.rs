@@ -65,7 +65,7 @@ pub fn do_accumulate(
     relu: bool,
 ) -> Vec<TinyNNFP16> {
     let mut out_values: Vec<TinyNNFP16> = Vec::new();
-    let mut cur_accum = bias;
+    let mut cur_accum = TinyNNFP16Zero;
     let mut cur_value_idx = 0;
 
     for v in in_values {
@@ -73,13 +73,15 @@ pub fn do_accumulate(
         cur_value_idx += 1;
 
         if cur_value_idx == values_per_accum {
+            cur_accum = cur_accum + bias;
+
             if relu && cur_accum.sgn() {
                 cur_accum = TinyNNFP16Zero;
             }
 
             out_values.push(cur_accum);
 
-            cur_accum = bias;
+            cur_accum = TinyNNFP16Zero;
             cur_value_idx = 0;
         }
     }
