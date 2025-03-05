@@ -1,5 +1,6 @@
+use rand::Rng;
 use super::ops::{do_convolve, ConvHeight, ConvWidth};
-use super::tnn_types::{TinyNNFP16, TinyNNFP16Zero, TinyNNFP16StdNaN};
+use super::tnn_types::{TinyNNFP16, TinyNNFP16Zero, TinyNNFP16StdNaN, TNNFP16MantWidth, TNNFP16ExpWidth};
 use ndarray::{s, Array1, Array2};
 use std::io;
 
@@ -7,9 +8,11 @@ use std::io;
 const ConvFirstOutputDelay: usize = 12 + 8;
 const ConvRowOutputDelay: usize = 6;
 const AccumFirstOutputDelay: usize = 3;
+const MulAccOutputDelay: usize = 4;
 
 const TNNCmdOpConvolve: u16 = 1 << 12;
 const TNNCmdOpAccumulate: u16 = 2 << 12;
+const TNNCmdOpMulAcc: u16 = 3 << 12;
 
 pub fn conv_stream_from_image_row(
     image: &Array2<TinyNNFP16>,
@@ -119,6 +122,17 @@ pub fn full_accum_stream(accum_values: &Vec<TinyNNFP16>, values_per_accum: usize
     return output;
 }
 
+pub fn full_mul_acc_stream(mul_acc_values: &Vec<TinyNNFP16>, bias: TinyNNFP16, relu: bool) -> Vec<u16> {
+    let relu_flag: u16 = if relu {0x100} else {0x0};
+    let mut output: Vec<u16> = vec![TNNCmdOpMulAcc | relu_flag];
+
+    output.push(bias.as_u16());
+    output.extend(mul_acc_values.iter().map(|x| x.as_u16()));
+    output.push(TinyNNFP16StdNaN.as_u16());
+
+    return output;
+}
+
 pub fn output_stream_from_accum_result(accum_result: &Vec<TinyNNFP16>, values_per_accum: usize) -> Vec<Option<u8>> {
     let mut output: Vec<Option<u8>> = vec![None; AccumFirstOutputDelay + 2];
 
@@ -130,4 +144,27 @@ pub fn output_stream_from_accum_result(accum_result: &Vec<TinyNNFP16>, values_pe
     }
 
     return output;
+}
+
+pub fn output_stream_from_mul_acc_result(num_params: usize, result: TinyNNFP16) -> Vec<Option<u8>> {
+    let mut output: Vec<Option<u8>> = vec![None; MulAccOutputDelay + num_params * 2];
+    let result_16 = result.as_u16();
+    output.push(Some((result_16 & 0xff) as u8));
+    output.push(Some((result_16 >> 8) as u8));
+
+    return output;
+}
+
+pub fn gen_rand_mul_acc(num_params: usize) -> (Vec<TinyNNFP16>, TinyNNFP16) {
+    let mut output: Vec<TinyNNFP16> = Vec::new();
+    let mut rng = rand::thread_rng();
+    let high_exp = rng.gen_range((1 << (TNNFP16ExpWidth - 1)) - 10..(1 << (TNNFP16ExpWidth - 1)) + 10);
+    let low_exp = high_exp - 5;
+
+    for _ in 0..num_params {
+        output.push(TinyNNFP16::new(rng.gen(), rng.gen_range(low_exp..high_exp), rng.gen_range(0..(1 << TNNFP16MantWidth))));
+        output.push(TinyNNFP16::new(rng.gen(), rng.gen_range(low_exp..high_exp), rng.gen_range(0..(1 << TNNFP16MantWidth))));
+    }
+
+    return (output, TinyNNFP16::new(rng.gen(), rng.gen_range(high_exp-2..high_exp), rng.gen_range(0..(1 << TNNFP16MantWidth))));
 }

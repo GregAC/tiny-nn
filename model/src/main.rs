@@ -83,8 +83,8 @@ fn create_add_mul_tests() {
 }
 
 fn gen_convolve() {
-    let test_image = test_data::get_mnist_image();
-    let test_params = test_data::get_mnist_convolve_0_params();
+    let test_image = test_data::get_incrementing_test_image();
+    let test_params = test_data::get_half_const_convolve_params();
 
     let conv_result = utils::conv_image(&test_image, &test_params, 0, 0);
 
@@ -124,29 +124,43 @@ fn gen_convolve() {
 }
 
 fn gen_accumulate() {
-    let test_nums = vec![
-        TinyNNFP16::from_f32(0.25),
-        TinyNNFP16::from_f32(0.5),
-        TinyNNFP16::from_f32(0.75),
-        TinyNNFP16::from_f32(1.0),
+    //let test_nums = vec![
+    //    TinyNNFP16::from_f32(0.25),
+    //    TinyNNFP16::from_f32(0.5),
+    //    TinyNNFP16::from_f32(0.75),
+    //    TinyNNFP16::from_f32(1.0),
 
-        TinyNNFP16::from_f32(1.25),
-        TinyNNFP16::from_f32(1.5),
-        TinyNNFP16::from_f32(1.75),
+    //    TinyNNFP16::from_f32(1.25),
+    //    TinyNNFP16::from_f32(1.5),
+    //    TinyNNFP16::from_f32(1.75),
+    //    TinyNNFP16::from_f32(2.0),
+
+    //    TinyNNFP16::from_f32(2.25),
+    //    TinyNNFP16::from_f32(2.5),
+    //    TinyNNFP16::from_f32(2.75),
+    //    TinyNNFP16::from_f32(3.0),
+
+    //    TinyNNFP16::from_f32(3.25),
+    //    TinyNNFP16::from_f32(3.5),
+    //    TinyNNFP16::from_f32(3.75),
+    //    TinyNNFP16::from_f32(4.0),
+    //];
+
+    let test_nums = vec![
+        TinyNNFP16::from_f32(1.0),
         TinyNNFP16::from_f32(2.0),
 
-        TinyNNFP16::from_f32(2.25),
-        TinyNNFP16::from_f32(2.5),
-        TinyNNFP16::from_f32(2.75),
         TinyNNFP16::from_f32(3.0),
-
-        TinyNNFP16::from_f32(3.25),
-        TinyNNFP16::from_f32(3.5),
-        TinyNNFP16::from_f32(3.75),
         TinyNNFP16::from_f32(4.0),
+
+        TinyNNFP16::from_f32(5.0),
+        TinyNNFP16::from_f32(6.0),
+
+        TinyNNFP16::from_f32(7.0),
+        TinyNNFP16::from_f32(8.0),
     ];
 
-    let test_accumulate = ops::do_accumulate(&test_nums, 2, TinyNNFP16::from_f32(-4.0), true);
+    let test_accumulate = ops::do_accumulate(&test_nums, 2, TinyNNFP16::from_f32(-3.5), true);
 
     for v in &test_accumulate {
         println!("{} {:04x} {:02x} {:02x}", v.to_f32(), v.as_u16(), v.mant(), v.exp());
@@ -158,7 +172,7 @@ fn gen_accumulate() {
     };
 
 
-    let test_input_stream = utils::full_accum_stream(&test_nums, 2, TinyNNFP16::from_f32(-4.0), true);
+    let test_input_stream = utils::full_accum_stream(&test_nums, 2, TinyNNFP16::from_f32(-3.5), true);
 
     for x in test_input_stream {
         write!(test_file, "{:04x}\n", x);
@@ -221,6 +235,57 @@ fn gen_accumulate2() {
     utils::write_output_stream(&expected_output, &mut expected_output_file);
 }
 
+fn gen_simple_mul_acc() {
+    let test_vals = vec![
+        TinyNNFP16::from_f32(1.0), TinyNNFP16::from_f32(2.0),
+        TinyNNFP16::from_f32(3.0), TinyNNFP16::from_f32(4.0),
+        TinyNNFP16::from_f32(5.0), TinyNNFP16::from_f32(6.0),
+        TinyNNFP16::from_f32(7.0), TinyNNFP16::from_f32(8.0),
+    ];
+
+    let mul_acc_result = ops::do_mul_acc(&test_vals, TinyNNFP16::from_f32(0.5), true);
+
+    println!("{} {:04x} {:02x} {:02x}", mul_acc_result.to_f32(), mul_acc_result.as_u16(), mul_acc_result.mant(), mul_acc_result.exp());
+
+    let mut test_file = match File::create("test_vec.hex") {
+        Err(why) => panic!("couldn't open test_vec.hex: {}", why),
+        Ok(file) => BufWriter::new(file),
+    };
+
+    let test_input_stream = utils::full_mul_acc_stream(&test_vals, TinyNNFP16::from_f32(0.5), true);
+
+    for x in test_input_stream {
+        write!(test_file, "{:04x}\n", x);
+    }
+}
+
+fn gen_rnd_mul_acc(num_params: usize, relu: bool) {
+    let (test_vals, bias) = utils::gen_rand_mul_acc(num_params);
+    let mul_acc_result = ops::do_mul_acc(&test_vals, bias, relu);
+
+    println!("{} {:04x} {:02x} {:02x}", mul_acc_result.to_f32(), mul_acc_result.as_u16(), mul_acc_result.mant(), mul_acc_result.exp());
+
+    let mut test_file = match File::create("test_vec.hex") {
+        Err(why) => panic!("couldn't open test_vec.hex: {}", why),
+        Ok(file) => BufWriter::new(file),
+    };
+
+    let test_input_stream = utils::full_mul_acc_stream(&test_vals, bias, relu);
+
+    for x in test_input_stream {
+        write!(test_file, "{:04x}\n", x);
+    }
+
+    let expected_output = utils::output_stream_from_mul_acc_result(num_params, mul_acc_result);
+
+    let mut expected_output_file = match File::create("expected_out.hex") {
+        Err(why) => panic!("couldn't open expected_out.hex: {}", why),
+        Ok(file) => BufWriter::new(file),
+    };
+
+    utils::write_output_stream(&expected_output, &mut expected_output_file);
+}
+
 fn main() {
-    gen_convolve();
+    gen_rnd_mul_acc(7, true);
 }

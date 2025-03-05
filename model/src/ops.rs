@@ -88,3 +88,30 @@ pub fn do_accumulate(
 
     return out_values;
 }
+
+pub fn do_mul_acc(
+    in_values: &Vec<TinyNNFP16>,
+    bias: TinyNNFP16,
+    relu: bool
+) -> TinyNNFP16 {
+    let mut result = TinyNNFP16Zero;
+    let mut i = 0;
+
+    for vp in in_values[..].chunks(2) {
+        println!("val {}: {:x} {:x}", i, vp[0].exp(), vp[0].mant());
+        println!("param {}: {:x} {:x}", i, vp[1].exp(), vp[1].mant());
+        result = result + (vp[0] * vp[1]);
+        println!("result {}: {:x} {:x}", i, result.exp(), result.mant());
+
+        i = i + 1;
+    }
+
+    result = result + bias;
+
+    if (result.sgn() && relu) {
+        TinyNNFP16Zero
+    } else {
+        result
+    }
+}
+
