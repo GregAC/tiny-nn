@@ -19,13 +19,16 @@ module tiny_nn_top import tiny_nn_pkg::*; #(
   logic                    relu_q, relu_d;
   logic                    convolve_run;
 
-  logic                    core_mul_add_op_a_en;
-  logic                    core_mul_add_op_b_en;
-  logic [1:0]              core_accumulate_mode_0_en;
-  logic [1:0]              core_accumulate_mode_1_en;
-  logic                    core_accumulate_loopback;
-  logic                    core_accumulate_out_relu;
-  logic                    core_accumulate_level_0_en;
+  logic [ValArrayHeight-1:0] core_val_shift;
+  logic                      core_mul_row_sel, core_mul_en;
+  fp_t                       core_accumulate_result;
+  logic                      core_mul_add_op_a_en;
+  logic                      core_mul_add_op_b_en;
+  logic [1:0]                core_accumulate_mode_0_en;
+  logic [1:0]                core_accumulate_mode_1_en;
+  logic                      core_accumulate_loopback;
+  logic                      core_accumulate_out_relu;
+  logic                      core_accumulate_level_0_en;
 
   typedef enum logic [3:0] {
     NNIdle              = 4'h0,
@@ -35,6 +38,9 @@ module tiny_nn_top import tiny_nn_pkg::*; #(
     NNAccumulateBiasIn  = 4'h4,
     NNAccumulateExec    = 4'h5,
     NNAccumulateExecEnd = 4'h6,
+    NNMulAccBiasIn      = 4'h7,
+    NNMulAccExec        = 4'h8,
+    NNMulAccExecEnd     = 4'h9,
     NNTestCount         = 4'hd,
     NNTestPulse         = 4'he,
     NNTestASCII         = 4'hf
@@ -43,19 +49,24 @@ module tiny_nn_top import tiny_nn_pkg::*; #(
   state_e state_q, state_d;
 
   always_comb begin
-    state_d                      = state_q;
-    counter_d                    = counter_q;
-    start_count_d                = start_count_q;
-    phase_d                      = 1'b0;
-    param_write_d                = param_write_q;
-    convolve_run                 = 1'b0;
-    relu_d                       = relu_q;
-    core_mul_add_op_a_en         = 1'b0;
-    core_mul_add_op_b_en         = 1'b0;
-    core_accumulate_mode_1_en    = '0;
-    core_accumulate_loopback     = 1'b0;
-    core_accumulate_out_relu     = 1'b0;
-    core_accumulate_level_0_en   = 1'b0;
+    state_d       = state_q;
+    counter_d     = counter_q;
+    start_count_d = start_count_q;
+    phase_d       = 1'b0;
+    param_write_d = param_write_q;
+    convolve_run  = 1'b0;
+    relu_d        = relu_q;
+
+    core_val_shift             = '0;
+    core_mul_row_sel           = 1'b0;
+    core_mul_en                = 1'b0;
+    core_mul_add_op_a_en       = 1'b0;
+    core_mul_add_op_b_en       = 1'b0;
+    core_accumulate_mode_0_en  = '0;
+    core_accumulate_mode_1_en  = '0;
+    core_accumulate_loopback   = 1'b0;
+    core_accumulate_out_relu   = 1'b0;
+    core_accumulate_level_0_en = 1'b0;
 
     case (state_q)
       NNIdle: begin
@@ -69,10 +80,8 @@ module tiny_nn_top import tiny_nn_pkg::*; #(
           CmdOpAccumulate: begin
             start_count_d = data_i[CountWidth-1:0];
             counter_d     = CountWidth'(1'b1);
-
-            state_d = NNAccumulateBiasIn;
-
-            relu_d = data_i[8];
+            state_d       = NNAccumulateBiasIn;
+            relu_d        = data_i[8];
           end
           CmdOpTest: begin
             case (data_i[11:8])
@@ -91,6 +100,12 @@ module tiny_nn_top import tiny_nn_pkg::*; #(
               default: ;
             endcase
           end
+          CmdOpMulAcc: begin
+            state_d       = NNMulAccBiasIn;
+            relu_d        = data_i[8];
+            phase_d       = 1'b0;
+            counter_d     = CountWidth'(2'd3);
+          end
           default: ;
         endcase
       end
@@ -107,6 +122,14 @@ module tiny_nn_top import tiny_nn_pkg::*; #(
       NNConvolveExec, NNConvolveExecEnd: begin
         phase_d      = ~phase_q;
         convolve_run = 1'b1;
+
+        core_val_shift[0] = ~phase_q;
+        core_val_shift[1] =  phase_q;
+        core_mul_row_sel  =  phase_q;
+        core_mul_en       = 1'b1;
+
+        core_accumulate_mode_0_en[0] = 1'b1;
+        core_accumulate_mode_0_en[1] = phase_q;
 
         if (state_q == NNConvolveExec) begin
           if (data_i == FPStdNaN) begin
@@ -159,6 +182,50 @@ module tiny_nn_top import tiny_nn_pkg::*; #(
 
         counter_d = counter_q - 1'b1;
       end
+      NNMulAccBiasIn: begin
+        core_accumulate_level_0_en = 1'b1;
+        core_mul_add_op_a_en       = 1'b1;
+        state_d                    = NNMulAccExec;
+      end
+      NNMulAccExec: begin
+        phase_d          = ~phase_q;
+        core_mul_row_sel = 1'b1;
+
+        // Don't loopback for first number!
+        if (phase_q) begin
+          core_val_shift[0]            = 1'b0;
+          param_write_d[6]             = 1'b0;
+          core_accumulate_mode_1_en[0] = 1'b1;
+          core_accumulate_loopback     = counter_q == '0;
+        end else begin
+          core_val_shift[0] = 1'b1;
+          param_write_d[6]  = 1'b1;
+
+          core_mul_en = counter_q != CountWidth'(2'd3);
+
+          if (counter_q != '0) begin
+            counter_d = counter_q - 1'b1;
+          end
+
+          if (data_i == FPStdNaN) begin
+            state_d   = NNMulAccExecEnd;
+            counter_d = 8'd3;
+          end
+        end
+      end
+      NNMulAccExecEnd: begin
+        if (counter_q == 8'd3) begin
+          core_accumulate_loopback     = 1'b1;
+          core_accumulate_mode_1_en[0] = 1'b1;
+        end else if (counter_q == 8'd2) begin
+          core_accumulate_mode_1_en[1] = 1'b1;
+          core_accumulate_out_relu = relu_q;
+        end else if (counter_q == '0) begin
+          state_d = NNIdle;
+        end
+
+        counter_d = counter_q - 1'b1;
+      end
       NNTestASCII: begin
         if (data_i[15:8] == 8'hff) begin
           if (counter_q == 0) begin
@@ -203,20 +270,6 @@ module tiny_nn_top import tiny_nn_pkg::*; #(
     param_write_q <= param_write_d;
     relu_q        <= relu_d;
   end
-
-  logic [ValArrayHeight-1:0] core_val_shift;
-  logic                      core_mul_row_sel, core_mul_en;
-  fp_t                       core_accumulate_result;
-  fp_t                       accumulate_level_1_direct_din;
-
-  assign core_val_shift[0]            = ~phase_q & convolve_run;
-  assign core_val_shift[1]            =  phase_q & convolve_run;
-  assign core_mul_row_sel             =  phase_q;
-  assign core_mul_en                  =  convolve_run;
-  assign core_accumulate_mode_0_en[0] =  convolve_run;
-  assign core_accumulate_mode_0_en[1] =  phase_q & convolve_run;
-
-  assign accumulate_level_1_direct_din = data_i;
 
   tiny_nn_core #(
     .ValArrayWidth(ValArrayWidth),
@@ -292,6 +345,9 @@ module tiny_nn_top import tiny_nn_pkg::*; #(
         end
       end
       NNAccumulateExecEnd: begin
+        data_o = counter_q[0] ? core_accumulate_result[7:0] : core_accumulate_result[15:8];
+      end
+      NNMulAccExecEnd: begin
         data_o = counter_q[0] ? core_accumulate_result[7:0] : core_accumulate_result[15:8];
       end
       NNTestASCII, NNTestPulse, NNTestCount: begin
