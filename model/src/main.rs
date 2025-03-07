@@ -257,6 +257,15 @@ fn gen_simple_mul_acc() {
     for x in test_input_stream {
         write!(test_file, "{:04x}\n", x);
     }
+
+    let expected_output = utils::output_stream_from_mul_acc_result(4, mul_acc_result);
+
+    let mut expected_output_file = match File::create("expected_out.hex") {
+        Err(why) => panic!("couldn't open expected_out.hex: {}", why),
+        Ok(file) => BufWriter::new(file),
+    };
+
+    utils::write_output_stream(&expected_output, &mut expected_output_file);
 }
 
 fn gen_rnd_mul_acc(num_params: usize, relu: bool) {
