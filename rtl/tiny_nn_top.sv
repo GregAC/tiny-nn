@@ -87,7 +87,7 @@ module tiny_nn_top import tiny_nn_pkg::*; #(
             case (data_i[11:8])
               4'hf: begin
                 state_d   = NNTestASCII;
-                counter_d = 8'd4;
+                counter_d = 8'd3;
               end
               4'h1: begin
                 state_d   = NNTestCount;
@@ -229,7 +229,7 @@ module tiny_nn_top import tiny_nn_pkg::*; #(
       NNTestASCII: begin
         if (data_i[15:8] == 8'hff) begin
           if (counter_q == 0) begin
-            counter_d = 8'd4;
+            counter_d = 8'd3;
           end else begin
             counter_d = counter_q - 1'b1;
           end
@@ -312,7 +312,7 @@ module tiny_nn_top import tiny_nn_pkg::*; #(
     case (state_q)
       NNTestASCII: begin
         case (counter_q)
-          8'd3, 8'd4: test_out = 8'h54;
+          8'd3:       test_out = 8'h54;
           8'd2:       test_out = 8'h2d;
           8'd0, 8'd1: test_out = 8'h4e;
           default:    test_out = '0;
