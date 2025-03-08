@@ -148,7 +148,6 @@ def print_results_table(results: Dict[str, TestStatus], use_color: bool = True):
         header_test = colorize(header_test, Colors.BOLD)
         header_result = colorize(header_result, Colors.BOLD)
 
-    print('max_name_len is ', max_name_len)
     print(separator)
     print(f"| {header_test:<{max_name_len+8}} | {header_result:<{result_col_width+8}} |")
     print(separator)
