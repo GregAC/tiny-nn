@@ -27,6 +27,7 @@ module tiny_nn_core import tiny_nn_pkg::*; #(
 
   input logic [1:0] accumulate_mode_0_en_i,
   input logic [1:0] accumulate_mode_1_en_i,
+  input logic [1:0] accumulate_mode_2_en_i,
   output fp_t accumulate_o
 );
 
@@ -130,7 +131,7 @@ module tiny_nn_core import tiny_nn_pkg::*; #(
       assign accumulate_level_0_d[x] = accumulate_level_0_en_i ? accumulate_level_0_din_i :
                                                                  mul_add_result[x];
     end else begin
-      assign accumulate_level_0_en[x] = accumulate_mode_1_en_i[0] | accumulate_mode_0_en_i[0];
+      assign accumulate_level_0_en[x] = accumulate_mode_2_en_i[0] | accumulate_mode_1_en_i[0] | accumulate_mode_0_en_i[0];
       assign accumulate_level_0_d[x]  = mul_add_result[x];
     end
 
@@ -177,12 +178,14 @@ module tiny_nn_core import tiny_nn_pkg::*; #(
       end else begin
         accumulate_final_d = accumulate_level_0_result;
       end
+    end else if (accumulate_mode_2_en_i[1]) begin
+      accumulate_final_d = mul_add_result[1];
     end else begin
       accumulate_final_d = accumulate_final_result;
     end
   end
 
-  assign accumulate_final_en = accumulate_mode_0_en_i[1] | accumulate_mode_1_en_i[1];
+  assign accumulate_final_en = accumulate_mode_0_en_i[1] | accumulate_mode_1_en_i[1] | accumulate_mode_2_en_i[1];
 
   always_ff @(posedge clk_i) begin
     if (accumulate_final_en) begin

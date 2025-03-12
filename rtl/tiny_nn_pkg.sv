@@ -37,8 +37,10 @@ package tiny_nn_pkg;
     return x == FPPosInf || x == FPNegInf;
   endfunction
 
-  parameter logic [3:0] CmdOpConvolve   = 4'h1;
-  parameter logic [3:0] CmdOpAccumulate = 4'h2;
-  parameter logic [3:0] CmdOpMulAcc     = 4'h3;
-  parameter logic [3:0] CmdOpTest       = 4'hf;
+  parameter logic [3:0] CmdOpConvolve    = 4'h1;
+  parameter logic [3:0] CmdOpAccumulate  = 4'h2;
+  parameter logic [3:0] CmdOpMulAcc      = 4'h3;
+  parameter logic [3:0] CmdOpFixedMulAcc = 4'h4;
+  parameter logic [3:0] CmdOpMaxPool     = 4'h5;
+  parameter logic [3:0] CmdOpTest        = 4'hf;
 endpackage

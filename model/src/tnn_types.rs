@@ -1,5 +1,6 @@
 use rand::Rng;
 use std::ops;
+use std::cmp::Ordering;
 
 pub const TNNFP16MantWidth: u16 = 7;
 pub const TNNFP16ExpWidth: u16 = 8;
@@ -291,6 +292,62 @@ impl ops::Add<TinyNNFP16> for TinyNNFP16 {
             TinyNNFP16Zero
         } else {
             TinyNNFP16::new(sum_mant_sgn, final_exp as u16, final_mant as u16)
+        }
+    }
+}
+
+impl PartialOrd for TinyNNFP16 {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        if (self.is_nan() || other.is_nan()) {
+            None
+        } else if (self.0 == other.0) {
+            Some(Ordering::Equal)
+        } else if self.is_inf() {
+            if (self.sgn()) {
+                Some(Ordering::Less)
+            } else {
+                Some(Ordering::Greater)
+            }
+        } else if other.is_inf() {
+            if other.sgn() {
+                Some(Ordering::Greater)
+            } else {
+                Some(Ordering::Less)
+            }
+        } else if self.is_zero() {
+            if (other.sgn()) {
+                Some(Ordering::Greater)
+            } else {
+                Some(Ordering::Less)
+            }
+        } else if other.is_zero() {
+            if (self.sgn()) {
+                Some(Ordering::Less)
+            } else {
+                Some(Ordering::Greater)
+            }
+        } else if (!self.sgn() && other.sgn()) {
+            Some(Ordering::Greater)
+        } else if (self.sgn() && !other.sgn()) {
+            Some(Ordering::Less)
+        } else {
+            let pos_result = if self.exp() > other.exp() {
+                Ordering::Greater
+            } else if self.exp() == other.exp() {
+                if (self.mant() > other.mant()) {
+                    Ordering::Greater
+                } else {
+                    Ordering::Less
+                }
+            } else {
+                Ordering::Less
+            };
+
+            if (self.sgn()) {
+                Some(pos_result.reverse())
+            } else {
+                Some(pos_result)
+            }
         }
     }
 }

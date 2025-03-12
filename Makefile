@@ -3,8 +3,9 @@ VERILATOR_ARGS = --binary --trace-fst --trace-structs
 RTL_FILES = ./rtl/tiny_nn_pkg.sv \
   ./rtl/fp_add.sv \
   ./rtl/fp_mul.sv \
+	./rtl/fp_cmp.sv \
   ./rtl/tiny_nn_core.sv \
-  ./rtl/tiny_nn_top.sv
+  ./rtl/tiny_nn_top.sv \
 
 TOP_DV_FILES = ./dv/tiny_nn_top_tb.sv
 

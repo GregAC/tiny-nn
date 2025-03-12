@@ -5,14 +5,18 @@ use ndarray::{s, Array1, Array2};
 use std::io;
 
 // 8 cycles for parameters, then 12 cycles for first valid convolve result
-const ConvFirstOutputDelay: usize = 12 + 8;
+const ConvFirstOutputDelay: usize = 14 + 8;
 const ConvRowOutputDelay: usize = 6;
-const AccumFirstOutputDelay: usize = 3;
-const MulAccOutputDelay: usize = 4;
+const AccumFirstOutputDelay: usize = 5;
+const FixedMulAccFirstOutputDelay: usize = 6;
+const MaxPoolFirstOutputDelay: usize = 1;
+const MulAccOutputDelay: usize = 6;
 
 const TNNCmdOpConvolve: u16 = 1 << 12;
 const TNNCmdOpAccumulate: u16 = 2 << 12;
 const TNNCmdOpMulAcc: u16 = 3 << 12;
+const TNNCmdOpFixedMulAcc: u16 = 4 << 12;
+const TNNCmdOpMaxPool: u16 = 5 << 12;
 
 pub fn conv_stream_from_image_row(
     image: &Array2<TinyNNFP16>,
@@ -133,6 +137,25 @@ pub fn full_mul_acc_stream(mul_acc_values: &Vec<TinyNNFP16>, bias: TinyNNFP16, r
     return output;
 }
 
+pub fn full_fixed_mul_acc_stream(mul_acc_values: &Vec<TinyNNFP16>, values_per_mul_acc: usize,  param: TinyNNFP16) -> Vec<u16> {
+    let mut output: Vec<u16> = vec![TNNCmdOpFixedMulAcc | (((values_per_mul_acc - 1) & 0xff) as u16)];
+
+    output.push(param.as_u16());
+    output.extend(mul_acc_values.iter().map(|x| x.as_u16()));
+    output.push(TinyNNFP16StdNaN.as_u16());
+
+    return output;
+}
+
+pub fn full_max_pool_stream(max_pool_values: &Vec<TinyNNFP16>, values_per_pool: usize) -> Vec<u16> {
+    let mut output: Vec<u16> = vec![TNNCmdOpMaxPool | (((values_per_pool - 1) & 0xff) as u16)];
+
+    output.extend(max_pool_values.iter().map(|x| x.as_u16()));
+    output.push(TinyNNFP16StdNaN.as_u16());
+
+    return output;
+}
+
 pub fn output_stream_from_accum_result(accum_result: &Vec<TinyNNFP16>, values_per_accum: usize) -> Vec<Option<u8>> {
     let mut output: Vec<Option<u8>> = vec![None; AccumFirstOutputDelay + 2];
 
@@ -155,6 +178,32 @@ pub fn output_stream_from_mul_acc_result(num_params: usize, result: TinyNNFP16) 
     return output;
 }
 
+pub fn output_stream_from_fixed_mul_acc_result(mul_acc_result: &Vec<TinyNNFP16>, values_per_mul_acc: usize) -> Vec<Option<u8>> {
+    let mut output: Vec<Option<u8>> = vec![None; FixedMulAccFirstOutputDelay + 2];
+
+    for v in mul_acc_result {
+        output.extend(vec![None; values_per_mul_acc - 2]);
+        let v_16 = v.as_u16();
+        output.push(Some((v_16 & 0xff) as u8));
+        output.push(Some((v_16 >> 8) as u8));
+    }
+
+    return output;
+}
+
+pub fn output_stream_from_max_pool_result(max_pool_result: &Vec<TinyNNFP16>, values_per_pool: usize) -> Vec<Option<u8>> {
+    let mut output: Vec<Option<u8>> = vec![None; MaxPoolFirstOutputDelay + 2];
+
+    for v in max_pool_result {
+        output.extend(vec![None; values_per_pool - 2]);
+        let v_16 = v.as_u16();
+        output.push(Some((v_16 & 0xff) as u8));
+        output.push(Some((v_16 >> 8) as u8));
+    }
+
+    return output;
+}
+
 pub fn gen_rand_mul_acc(num_params: usize) -> (Vec<TinyNNFP16>, TinyNNFP16) {
     let mut output: Vec<TinyNNFP16> = Vec::new();
     let mut rng = rand::thread_rng();
@@ -168,3 +217,36 @@ pub fn gen_rand_mul_acc(num_params: usize) -> (Vec<TinyNNFP16>, TinyNNFP16) {
 
     return (output, TinyNNFP16::new(rng.gen(), rng.gen_range(high_exp-2..high_exp), rng.gen_range(0..(1 << TNNFP16MantWidth))));
 }
+
+pub fn gen_rand_fixed_mul_acc(num_values: usize) -> (Vec<TinyNNFP16>, TinyNNFP16) {
+    let mut output: Vec<TinyNNFP16> = Vec::new();
+    let mut rng = rand::thread_rng();
+    let high_exp = rng.gen_range((1 << (TNNFP16ExpWidth - 1)) - 10..(1 << (TNNFP16ExpWidth - 1)) + 10);
+    let low_exp = high_exp - 5;
+
+    for _ in 0..num_values {
+        output.push(TinyNNFP16::new(rng.gen(), rng.gen_range(low_exp..high_exp), rng.gen_range(0..(1 << TNNFP16MantWidth))));
+    }
+
+    return (output, TinyNNFP16::new(rng.gen(), rng.gen_range(high_exp-5..high_exp-2), rng.gen_range(0..(1 << TNNFP16MantWidth))));
+}
+
+pub fn gen_rand_max_stream(num_values: usize) -> Vec<TinyNNFP16> {
+    let mut output: Vec<TinyNNFP16> = Vec::new();
+    let mut rng = rand::thread_rng();
+    let high_exp = rng.gen_range((1 << (TNNFP16ExpWidth - 1)) - 10..(1 << (TNNFP16ExpWidth - 1)) + 10);
+    let low_exp = high_exp - 5;
+
+    for _ in 0..num_values {
+        let force_zero: usize = rng.gen_range(0..3);
+
+        if force_zero == 0 {
+            output.push(TinyNNFP16Zero);
+        } else {
+            output.push(TinyNNFP16::new(rng.gen(), rng.gen_range(low_exp..high_exp), rng.gen_range(0..(1 << TNNFP16MantWidth))));
+        }
+    }
+
+    return output;
+}
+
