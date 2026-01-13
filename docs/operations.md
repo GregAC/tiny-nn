@@ -129,6 +129,78 @@ The output is seen 4 + num_values cycles after the command word is supplied
 where num_values is the total number of values (excluding the bias) that are
 provided, this is 8 in the example above.
 
+## Fixed Multiply-Accumulate
+
+| 15 - 12 | 11 - 8  | 7 - 0 |
+|---------|---------|-------|
+| 4'b0100 | ignored | count |
+
+Computes sums of groups of numbers where each number is multiplied by a fixed
+parameter. The 'count' field of the command word specifies how big each group
+of numbers is.
+
+Following the command word a single parameter value is input. This parameter is
+used as the multiplier for all subsequent input values. After the parameter,
+input values are provided and grouped according to the count field. Each value
+is multiplied by the parameter and the results are summed within each group.
+
+For example with count == 4 if the following is input after the command word:
+
+ - p
+ - v_0
+ - v_1
+ - v_2
+ - v_3
+ - v_4
+ - v_5
+ - v_6
+ - v_7
+
+The following would be computed:
+
+ - v_0 * p + v_1 * p + v_2 * p + v_3 * p
+ - v_4 * p + v_5 * p + v_6 * p + v_7 * p
+
+The first output is seen (3 + count) cycles after the command word is input.
+The gap between outputs is (count - 2) cycles (-2 to account for the 2 cycles
+each output takes).
+
+The operation is terminated with a standard NaN.
+
+## Max Pool
+
+| 15 - 12 | 11 - 8  | 7 - 0 |
+|---------|---------|-------|
+| 4'b0101 | ignored | count |
+
+Finds the maximum value in groups of input numbers. The 'count' field of the
+command word specifies the size of each group (the pool size).
+
+Following the command word, input values are provided. Values are grouped
+according to the count field and the maximum value within each group is output.
+
+For example with count == 4 if the following is input after the command word:
+
+ - v_0
+ - v_1
+ - v_2
+ - v_3
+ - v_4
+ - v_5
+ - v_6
+ - v_7
+
+The following would be computed:
+
+ - max(v_0, v_1, v_2, v_3)
+ - max(v_4, v_5, v_6, v_7)
+
+The maximum tracking is initialised to negative infinity at the start of each
+group. Output occurs as the final value of each group is processed - the low
+byte is output first, followed by the high byte.
+
+The operation is terminated with a standard NaN.
+
 ## Tests
 
 A number of test operations are provided to check basic input/output behaviour.
