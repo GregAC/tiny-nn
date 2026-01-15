@@ -97,15 +97,6 @@ pub fn do_mul_acc(
     let mut result = TinyNNFP16Zero;
     let mut i = 0;
 
-    for vp in in_values[..].chunks(2) {
-        println!("val {}: {:x} {:x}", i, vp[0].exp(), vp[0].mant());
-        println!("param {}: {:x} {:x}", i, vp[1].exp(), vp[1].mant());
-        result = result + (vp[0] * vp[1]);
-        println!("result {}: {:x} {:x}", i, result.exp(), result.mant());
-
-        i = i + 1;
-    }
-
     result = result + bias;
 
     if (result.sgn() && relu) {
@@ -127,10 +118,6 @@ pub fn do_fixed_mul_acc(
     for v in in_values {
         let mul_result = *v * param;
         cur_mul_acc = cur_mul_acc + mul_result;
-
-        println!("v {}: {:x} {:x}", cur_value_idx, v.exp(), v.mant());
-        println!("mul_result {}: {:x} {:x}", cur_value_idx, mul_result.exp(), mul_result.mant());
-        println!("cur_mul_acc {}: {:x} {:x}", cur_value_idx, cur_mul_acc.exp(), cur_mul_acc.mant());
 
         cur_value_idx += 1;
 
@@ -157,12 +144,9 @@ pub fn do_max_pool (
             cur_max = *v;
         }
 
-        println!("V {} is {}", cur_value_idx, v.to_f32());
-
         cur_value_idx += 1;
 
         if cur_value_idx == values_per_pool {
-            println!("Max was {}", cur_max.to_f32());
             out_values.push(cur_max);
             cur_max = TinyNNFP16NegInf;
             cur_value_idx = 0;

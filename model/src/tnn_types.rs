@@ -123,6 +123,10 @@ impl TinyNNFP16 {
         self.0
     }
 
+    pub fn from_u16(raw: u16) -> TinyNNFP16 {
+        TinyNNFP16(raw)
+    }
+
     pub fn is_inf(self) -> bool {
         !self.is_nan() && self.exp() == ((1 << TNNFP16ExpWidth) - 1)
     }

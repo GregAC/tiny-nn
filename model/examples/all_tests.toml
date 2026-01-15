@@ -1,0 +1,126 @@
+# Example config that replicates all the original hardcoded tests
+# Run with: cargo run -- generate examples/all_tests.toml -o test_output
+
+# ============================================================================
+# Convolution Tests
+# ============================================================================
+
+[[operation]]
+type = "convolve"
+name = "test_convolve_mnist_0"
+[operation.image]
+source = "builtin"
+name = "mnist_image"
+[operation.params]
+source = "builtin"
+name = "mnist_convolve_0_params"
+
+[[operation]]
+type = "convolve"
+name = "test_convolve_mnist_1"
+[operation.image]
+source = "builtin"
+name = "mnist_image"
+[operation.params]
+source = "builtin"
+name = "mnist_convolve_1_params"
+
+[[operation]]
+type = "convolve"
+name = "test_simple_convolve"
+[operation.image]
+source = "builtin"
+name = "incrementing_test_image"
+[operation.params]
+source = "builtin"
+name = "half_const_convolve_params"
+
+# ============================================================================
+# Accumulate Tests
+# ============================================================================
+
+[[operation]]
+type = "accumulate"
+name = "test_simple_2_accumulate"
+group_size = 2
+relu = true
+[operation.bias]
+source = "inline"
+value = -3.5
+[operation.values]
+source = "inline"
+values = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
+
+[[operation]]
+type = "accumulate"
+name = "test_simple_4_accumulate"
+group_size = 4
+relu = true
+[operation.bias]
+source = "inline"
+value = -3.5
+[operation.values]
+source = "inline"
+values = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0, 3.25, 3.5, 3.75, 4.0]
+
+# ============================================================================
+# Multiply-Accumulate Tests
+# ============================================================================
+
+[[operation]]
+type = "mul_acc"
+name = "test_simple_mul_acc"
+relu = true
+[operation.bias]
+source = "inline"
+value = 0.5
+[operation.values]
+source = "inline"
+# Interleaved value, param pairs: [v0, p0, v1, p1, v2, p2, v3, p3]
+values = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
+
+# ============================================================================
+# Fixed Multiply-Accumulate Tests
+# ============================================================================
+
+[[operation]]
+type = "fixed_mul_acc"
+name = "test_simple_fixed_mul_acc"
+group_size = 4
+[operation.param]
+source = "inline"
+value = 0.25
+[operation.values]
+source = "inline"
+values = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0]
+
+[[operation]]
+type = "fixed_mul_acc"
+name = "test_simple_fixed_mul_acc_2"
+group_size = 6
+[operation.param]
+source = "inline"
+value = 0.25
+[operation.values]
+source = "inline"
+values = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0]
+
+# ============================================================================
+# Max Pool Tests
+# ============================================================================
+
+[[operation]]
+type = "max_pool"
+name = "test_random_max_pool_1"
+values_per_pool = 4
+[operation.values]
+source = "random"
+count = 20
+
+[[operation]]
+type = "max_pool"
+name = "test_random_max_pool_2"
+values_per_pool = 8
+[operation.values]
+source = "random"
+count = 16

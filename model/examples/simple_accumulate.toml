@@ -1,0 +1,16 @@
+# Simple accumulate test example
+# Run with: cargo run -- generate examples/simple_accumulate.toml
+
+[[operation]]
+type = "accumulate"
+name = "test_accumulate"
+group_size = 4
+relu = true
+
+[operation.bias]
+source = "inline"
+value = -3.5
+
+[operation.values]
+source = "inline"
+values = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0]
