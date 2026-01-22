@@ -13,7 +13,7 @@ use std::path::Path;
 
 use cli::{Cli, Commands};
 use config::load_config;
-use executor::{execute_operation, ExecutionMode};
+use executor::execute_operation;
 use fsm::TnnSimulator;
 use input_source::HexFileInput;
 
@@ -22,7 +22,7 @@ fn main() {
 
     match cli.command {
         Commands::Generate { config, output_dir } => {
-            run_operations(&config, &output_dir, ExecutionMode::Generate);
+            run_generate(&config, &output_dir);
         }
         Commands::Simulate { input, output } => {
             run_simulation(&input, &output);
@@ -51,16 +51,12 @@ fn run_simulation(input_path: &Path, output_path: &Path) {
     println!("Done! Wrote {} output bytes", simulator.output().len());
 }
 
-fn run_operations(config_path: &Path, output_dir: &Path, mode: ExecutionMode) {
+fn run_generate(config_path: &Path, output_dir: &Path) {
     let config = load_config(config_path);
 
     println!(
-        "Running {} operation(s) in {:?} mode",
-        config.operation.len(),
-        match mode {
-            ExecutionMode::Generate => "generate",
-            ExecutionMode::Simulate => "simulate",
-        }
+        "Generating test vectors for {} operation(s)",
+        config.operation.len()
     );
     println!("Output directory: {:?}", output_dir);
     println!();
@@ -72,7 +68,7 @@ fn run_operations(config_path: &Path, output_dir: &Path, mode: ExecutionMode) {
     }
 
     for op in &config.operation {
-        execute_operation(op, output_dir, mode);
+        execute_operation(op, output_dir);
         println!();
     }
 

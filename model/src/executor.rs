@@ -4,16 +4,9 @@ use std::path::Path;
 
 use crate::config::Operation;
 use crate::ops;
-use crate::tnn_types::TinyNNFP16;
 use crate::utils;
 
-#[derive(Clone, Copy, PartialEq)]
-pub enum ExecutionMode {
-    Generate,  // Full test vectors with timing
-    Simulate,  // Just compute results, no timing
-}
-
-pub fn execute_operation(op: &Operation, base_output_dir: &Path, mode: ExecutionMode) {
+pub fn execute_operation(op: &Operation, base_output_dir: &Path) {
     let output_dir = op
         .output_dir
         .as_ref()
@@ -21,16 +14,16 @@ pub fn execute_operation(op: &Operation, base_output_dir: &Path, mode: Execution
         .unwrap_or(base_output_dir);
 
     match op.op_type.as_str() {
-        "convolve" => execute_convolve(op, output_dir, mode),
-        "accumulate" => execute_accumulate(op, output_dir, mode),
-        "mul_acc" => execute_mul_acc(op, output_dir, mode),
-        "fixed_mul_acc" => execute_fixed_mul_acc(op, output_dir, mode),
-        "max_pool" => execute_max_pool(op, output_dir, mode),
+        "convolve" => execute_convolve(op, output_dir),
+        "accumulate" => execute_accumulate(op, output_dir),
+        "mul_acc" => execute_mul_acc(op, output_dir),
+        "fixed_mul_acc" => execute_fixed_mul_acc(op, output_dir),
+        "max_pool" => execute_max_pool(op, output_dir),
         _ => panic!("Unknown operation type: '{}'", op.op_type),
     }
 }
 
-fn execute_convolve(op: &Operation, output_dir: &Path, mode: ExecutionMode) {
+fn execute_convolve(op: &Operation, output_dir: &Path) {
     let image = op
         .image
         .as_ref()
@@ -45,30 +38,21 @@ fn execute_convolve(op: &Operation, output_dir: &Path, mode: ExecutionMode) {
     // Compute convolution result
     let conv_result = utils::conv_image(&image, &params, 0, 0);
 
-    match mode {
-        ExecutionMode::Generate => {
-            // Generate input stream
-            let input_stream = utils::full_conv_stream(
-                &utils::input_conv_stream_from_image(&image),
-                &params,
-            );
+    // Generate input stream
+    let input_stream = utils::full_conv_stream(
+        &utils::input_conv_stream_from_image(&image),
+        &params,
+    );
 
-            // Generate expected output stream
-            let expected_output = utils::output_stream_from_conv_image(&conv_result);
+    // Generate expected output stream
+    let expected_output = utils::output_stream_from_conv_image(&conv_result);
 
-            // Write files
-            write_input_stream(output_dir, &op.name, &input_stream);
-            write_output_stream(output_dir, &op.name, &expected_output);
-        }
-        ExecutionMode::Simulate => {
-            // Write just the result values
-            let result_values: Vec<TinyNNFP16> = conv_result.iter().cloned().collect();
-            write_result_file(output_dir, &op.name, &result_values);
-        }
-    }
+    // Write files
+    write_input_stream(output_dir, &op.name, &input_stream);
+    write_output_stream(output_dir, &op.name, &expected_output);
 }
 
-fn execute_accumulate(op: &Operation, output_dir: &Path, mode: ExecutionMode) {
+fn execute_accumulate(op: &Operation, output_dir: &Path) {
     let values = op
         .values
         .as_ref()
@@ -88,25 +72,18 @@ fn execute_accumulate(op: &Operation, output_dir: &Path, mode: ExecutionMode) {
     // Compute accumulate result
     let accum_result = ops::do_accumulate(&values, group_size, bias, relu);
 
-    match mode {
-        ExecutionMode::Generate => {
-            // Generate input stream
-            let input_stream = utils::full_accum_stream(&values, group_size, bias, relu);
+    // Generate input stream
+    let input_stream = utils::full_accum_stream(&values, group_size, bias, relu);
 
-            // Generate expected output stream
-            let expected_output = utils::output_stream_from_accum_result(&accum_result, group_size);
+    // Generate expected output stream
+    let expected_output = utils::output_stream_from_accum_result(&accum_result, group_size);
 
-            // Write files
-            write_input_stream(output_dir, &op.name, &input_stream);
-            write_output_stream(output_dir, &op.name, &expected_output);
-        }
-        ExecutionMode::Simulate => {
-            write_result_file(output_dir, &op.name, &accum_result);
-        }
-    }
+    // Write files
+    write_input_stream(output_dir, &op.name, &input_stream);
+    write_output_stream(output_dir, &op.name, &expected_output);
 }
 
-fn execute_mul_acc(op: &Operation, output_dir: &Path, mode: ExecutionMode) {
+fn execute_mul_acc(op: &Operation, output_dir: &Path) {
     let values = op
         .values
         .as_ref()
@@ -129,25 +106,18 @@ fn execute_mul_acc(op: &Operation, output_dir: &Path, mode: ExecutionMode) {
 
     let num_params = values.len() / 2;
 
-    match mode {
-        ExecutionMode::Generate => {
-            // Generate input stream
-            let input_stream = utils::full_mul_acc_stream(&values, bias, relu);
+    // Generate input stream
+    let input_stream = utils::full_mul_acc_stream(&values, bias, relu);
 
-            // Generate expected output stream
-            let expected_output = utils::output_stream_from_mul_acc_result(num_params, mul_acc_result);
+    // Generate expected output stream
+    let expected_output = utils::output_stream_from_mul_acc_result(num_params, mul_acc_result);
 
-            // Write files
-            write_input_stream(output_dir, &op.name, &input_stream);
-            write_output_stream(output_dir, &op.name, &expected_output);
-        }
-        ExecutionMode::Simulate => {
-            write_result_file(output_dir, &op.name, &vec![mul_acc_result]);
-        }
-    }
+    // Write files
+    write_input_stream(output_dir, &op.name, &input_stream);
+    write_output_stream(output_dir, &op.name, &expected_output);
 }
 
-fn execute_fixed_mul_acc(op: &Operation, output_dir: &Path, mode: ExecutionMode) {
+fn execute_fixed_mul_acc(op: &Operation, output_dir: &Path) {
     let values = op
         .values
         .as_ref()
@@ -166,26 +136,19 @@ fn execute_fixed_mul_acc(op: &Operation, output_dir: &Path, mode: ExecutionMode)
     // Compute fixed_mul_acc result
     let fixed_mul_acc_result = ops::do_fixed_mul_acc(&values, group_size, param);
 
-    match mode {
-        ExecutionMode::Generate => {
-            // Generate input stream
-            let input_stream = utils::full_fixed_mul_acc_stream(&values, group_size, param);
+    // Generate input stream
+    let input_stream = utils::full_fixed_mul_acc_stream(&values, group_size, param);
 
-            // Generate expected output stream
-            let expected_output =
-                utils::output_stream_from_fixed_mul_acc_result(&fixed_mul_acc_result, group_size);
+    // Generate expected output stream
+    let expected_output =
+        utils::output_stream_from_fixed_mul_acc_result(&fixed_mul_acc_result, group_size);
 
-            // Write files
-            write_input_stream(output_dir, &op.name, &input_stream);
-            write_output_stream(output_dir, &op.name, &expected_output);
-        }
-        ExecutionMode::Simulate => {
-            write_result_file(output_dir, &op.name, &fixed_mul_acc_result);
-        }
-    }
+    // Write files
+    write_input_stream(output_dir, &op.name, &input_stream);
+    write_output_stream(output_dir, &op.name, &expected_output);
 }
 
-fn execute_max_pool(op: &Operation, output_dir: &Path, mode: ExecutionMode) {
+fn execute_max_pool(op: &Operation, output_dir: &Path) {
     let values = op
         .values
         .as_ref()
@@ -199,23 +162,16 @@ fn execute_max_pool(op: &Operation, output_dir: &Path, mode: ExecutionMode) {
     // Compute max_pool result
     let max_pool_result = ops::do_max_pool(&values, pool_size);
 
-    match mode {
-        ExecutionMode::Generate => {
-            // Generate input stream
-            let input_stream = utils::full_max_pool_stream(&values, pool_size);
+    // Generate input stream
+    let input_stream = utils::full_max_pool_stream(&values, pool_size);
 
-            // Generate expected output stream
-            let expected_output =
-                utils::output_stream_from_max_pool_result(&max_pool_result, pool_size);
+    // Generate expected output stream
+    let expected_output =
+        utils::output_stream_from_max_pool_result(&max_pool_result, pool_size);
 
-            // Write files
-            write_input_stream(output_dir, &op.name, &input_stream);
-            write_output_stream(output_dir, &op.name, &expected_output);
-        }
-        ExecutionMode::Simulate => {
-            write_result_file(output_dir, &op.name, &max_pool_result);
-        }
-    }
+    // Write files
+    write_input_stream(output_dir, &op.name, &input_stream);
+    write_output_stream(output_dir, &op.name, &expected_output);
 }
 
 // Helper functions for writing output files
@@ -241,20 +197,6 @@ fn write_output_stream(output_dir: &Path, name: &str, stream: &Vec<Option<u8>>) 
     );
 
     utils::write_output_stream(stream, &mut file);
-
-    file.flush().expect("Failed to flush file");
-    println!("Wrote: {:?}", path);
-}
-
-fn write_result_file(output_dir: &Path, name: &str, values: &Vec<TinyNNFP16>) {
-    let path = output_dir.join(format!("{}_result.hex", name));
-    let mut file = BufWriter::new(
-        File::create(&path).expect(&format!("Failed to create file: {:?}", path)),
-    );
-
-    for v in values {
-        writeln!(file, "{:04x}", v.as_u16()).expect("Failed to write to file");
-    }
 
     file.flush().expect("Failed to flush file");
     println!("Wrote: {:?}", path);
