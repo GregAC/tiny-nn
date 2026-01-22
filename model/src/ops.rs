@@ -95,11 +95,17 @@ pub fn do_mul_acc(
     relu: bool
 ) -> TinyNNFP16 {
     let mut result = TinyNNFP16Zero;
-    let mut i = 0;
+
+    // in_values contains interleaved (value, param) pairs
+    for chunk in in_values.chunks(2) {
+        if chunk.len() == 2 {
+            result = result + (chunk[0] * chunk[1]);
+        }
+    }
 
     result = result + bias;
 
-    if (result.sgn() && relu) {
+    if result.sgn() && relu {
         TinyNNFP16Zero
     } else {
         result

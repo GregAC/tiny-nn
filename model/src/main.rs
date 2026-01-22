@@ -1,6 +1,8 @@
 mod cli;
 mod config;
 mod executor;
+mod fsm;
+mod input_source;
 mod ops;
 mod test_data;
 mod tnn_types;
@@ -12,6 +14,8 @@ use std::path::Path;
 use cli::{Cli, Commands};
 use config::load_config;
 use executor::{execute_operation, ExecutionMode};
+use fsm::TnnSimulator;
+use input_source::HexFileInput;
 
 fn main() {
     let cli = Cli::parse();
@@ -20,10 +24,31 @@ fn main() {
         Commands::Generate { config, output_dir } => {
             run_operations(&config, &output_dir, ExecutionMode::Generate);
         }
-        Commands::Simulate { config, output_dir } => {
-            run_operations(&config, &output_dir, ExecutionMode::Simulate);
+        Commands::Simulate { input, output } => {
+            run_simulation(&input, &output);
         }
     }
+}
+
+fn run_simulation(input_path: &Path, output_path: &Path) {
+    println!("Running FSM simulation");
+    println!("  Input:  {:?}", input_path);
+    println!("  Output: {:?}", output_path);
+
+    // Load input
+    let mut input = HexFileInput::from_file(input_path)
+        .expect(&format!("Failed to read input file: {:?}", input_path));
+
+    // Run simulation
+    let mut simulator = TnnSimulator::new();
+    simulator.run(&mut input);
+
+    // Write output
+    simulator
+        .write_output(output_path)
+        .expect(&format!("Failed to write output file: {:?}", output_path));
+
+    println!("Done! Wrote {} output bytes", simulator.output().len());
 }
 
 fn run_operations(config_path: &Path, output_dir: &Path, mode: ExecutionMode) {

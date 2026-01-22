@@ -22,13 +22,14 @@ pub enum Commands {
         output_dir: PathBuf,
     },
 
-    /// Simulate operations and output results as hex (without timing information)
+    /// Run cycle-accurate FSM simulation on binary input
     Simulate {
-        /// Path to TOML configuration file
-        config: PathBuf,
+        /// Path to input hex file (16-bit words, one per line)
+        #[arg(short, long)]
+        input: PathBuf,
 
-        /// Output directory for result files
-        #[arg(short, long, default_value = ".")]
-        output_dir: PathBuf,
+        /// Path to output hex file (8-bit bytes, one per line)
+        #[arg(short, long)]
+        output: PathBuf,
     },
 }
