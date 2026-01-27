@@ -22,7 +22,14 @@ issue.
 
 # Operations
 
-Available operations are described in [operations.md](./operations.md)
+Available operations are described in [operations.md](./operations.md).
+
+# CNN Schema
+
+The TOML schema for describing CNN architectures at the layer level is documented
+in [cnn_schema.md](./cnn_schema.md). This schema is used by an external controller
+to decompose high-level layer descriptions (Conv2d, Linear, etc.) into sequences
+of TNN operations.
 
 # FP16 Format
 
