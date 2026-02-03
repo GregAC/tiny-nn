@@ -56,12 +56,15 @@ pub mod cnn;
 pub mod comm;
 pub mod error;
 pub mod fp16;
+pub mod io;
 pub mod runner;
 pub mod tnn_ops;
 pub mod translation;
 
 pub use cnn::{load_hex_file, load_model, CnnModel, TensorShape};
-pub use comm::{write_fp16_vec, CommandBuffer, TnnInterface};
+pub use comm::{write_fp16_vec, CommandBuffer, TnnInterface, TnnNetworkClient};
+pub use comm::{recv_fp16_values_with_padding, skip_latency_padding};
 pub use error::ControllerError;
 pub use fp16::TinyNNFP16;
-pub use runner::{plan_execution, CnnRunner, LayerPlan};
+pub use io::{read_input_json, write_output_json, JsonInput, JsonOutput};
+pub use runner::{plan_execution, CnnRunner, LayerPlan, LayerOutputs};

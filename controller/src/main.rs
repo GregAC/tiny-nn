@@ -3,7 +3,8 @@ use std::path::PathBuf;
 use clap::{Parser, Subcommand};
 
 use controller::{
-    load_hex_file, load_model, plan_execution, write_fp16_vec, CnnRunner, LayerPlan,
+    load_hex_file, load_model, plan_execution, read_input_json, write_fp16_vec,
+    write_output_json, CnnRunner, LayerPlan, TnnNetworkClient,
 };
 
 #[derive(Parser)]
@@ -29,6 +30,29 @@ enum Commands {
         /// Output directory for generated hex files
         #[arg(short, long, default_value = ".")]
         output_dir: PathBuf,
+    },
+
+    /// Run model live through TNN server
+    Run {
+        /// Path to the CNN model TOML file
+        #[arg(short, long)]
+        model: PathBuf,
+
+        /// Path to input JSON file
+        #[arg(short, long)]
+        input: PathBuf,
+
+        /// Path to output JSON file
+        #[arg(short, long)]
+        output: PathBuf,
+
+        /// TNN server address (host:port)
+        #[arg(long, default_value = "localhost:9876")]
+        host: String,
+
+        /// Include intermediate layer outputs
+        #[arg(long)]
+        intermediate: bool,
     },
 
     /// Show execution plan for a model
@@ -93,6 +117,62 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let input_fp16_path = output_dir.join("input_fp16.hex");
             write_fp16_vec(&input_data, &input_fp16_path)?;
             println!("Wrote input to: {}", input_fp16_path.display());
+
+            Ok(())
+        }
+
+        Commands::Run {
+            model,
+            input,
+            output,
+            host,
+            intermediate,
+        } => {
+            println!("Loading model from: {}", model.display());
+            let cnn_model = load_model(&model)?;
+
+            println!("Model: {}", cnn_model.metadata.name);
+            println!(
+                "Input shape: {:?}",
+                cnn_model.metadata.input_shape
+            );
+            println!("Output size: {}", cnn_model.metadata.output_size);
+
+            println!("\nLoading input from: {}", input.display());
+            let input_data = read_input_json(&input)?;
+            println!("Input values: {}", input_data.len());
+
+            let default_path = PathBuf::from(".");
+            let base_path = model.parent().unwrap_or(&default_path);
+            let runner = CnnRunner::new(cnn_model, base_path);
+
+            println!("\nConnecting to TNN server at {}...", host);
+            let mut interface = TnnNetworkClient::connect(&host)?;
+
+            println!("Running model...");
+            let results = runner.run(&input_data, &mut interface, intermediate)?;
+
+            println!("Got {} output values", results.final_output.len());
+            if intermediate {
+                println!(
+                    "Captured {} layer outputs",
+                    results.layer_outputs.len()
+                );
+            }
+
+            let layer_outputs = if intermediate {
+                Some(&results.layer_outputs)
+            } else {
+                None
+            };
+
+            write_output_json(
+                &output,
+                runner.model_name(),
+                &results.final_output,
+                layer_outputs,
+            )?;
+            println!("Wrote output to: {}", output.display());
 
             Ok(())
         }

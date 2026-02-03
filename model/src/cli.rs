@@ -32,4 +32,15 @@ pub enum Commands {
         #[arg(short, long)]
         output: PathBuf,
     },
+
+    /// Start TCP server for network-based simulation
+    Serve {
+        /// Port to listen on
+        #[arg(short, long, default_value = "9876")]
+        port: u16,
+
+        /// Host address to bind to
+        #[arg(long, default_value = "127.0.0.1")]
+        host: String,
+    },
 }

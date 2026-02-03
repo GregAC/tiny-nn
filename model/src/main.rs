@@ -3,6 +3,7 @@ mod config;
 mod executor;
 mod fsm;
 mod input_source;
+mod network;
 mod ops;
 mod test_data;
 mod tnn_types;
@@ -16,6 +17,7 @@ use config::load_config;
 use executor::execute_operation;
 use fsm::TnnSimulator;
 use input_source::HexFileInput;
+use network::TnnNetworkServer;
 
 fn main() {
     let cli = Cli::parse();
@@ -26,6 +28,9 @@ fn main() {
         }
         Commands::Simulate { input, output } => {
             run_simulation(&input, &output);
+        }
+        Commands::Serve { port, host } => {
+            run_server(&host, port);
         }
     }
 }
@@ -73,4 +78,22 @@ fn run_generate(config_path: &Path, output_dir: &Path) {
     }
 
     println!("Done!");
+}
+
+fn run_server(host: &str, port: u16) {
+    let addr = format!("{}:{}", host, port);
+    println!("Starting TNN simulation server on {}", addr);
+
+    let server = TnnNetworkServer::bind(&addr)
+        .expect(&format!("Failed to bind to {}", addr));
+
+    println!("Server listening on {}", server.local_addr().unwrap());
+
+    // Accept and run connections in a loop
+    loop {
+        if let Err(e) = server.accept_and_run() {
+            eprintln!("Connection error: {}", e);
+        }
+        println!("Connection closed, waiting for next connection...");
+    }
 }
