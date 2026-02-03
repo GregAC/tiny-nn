@@ -1,3 +1,7 @@
+NOTE: Much of the latest development in this repo comes from claude code. It has
+been lightly reviewed and tested so far and various things may be broken, use
+the latest main branch at your peril!
+
 Overview
 --------
 
