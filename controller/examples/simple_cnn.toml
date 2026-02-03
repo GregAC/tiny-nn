@@ -1,0 +1,67 @@
+# Simple CNN for testing the controller
+# This is a minimal CNN with one of each layer type
+
+[metadata]
+name = "SimpleCNN"
+description = "Simple test CNN for controller validation"
+input_shape = [1, 8, 8]  # 1 channel, 8x8 image
+output_size = 2
+
+# First layer: 2x2 average pooling
+[[layer]]
+type = "avg_pool2d"
+name = "pool1"
+kernel_size = 2
+stride = 2
+
+# Second layer: 4x4 convolution with 2 output channels
+[[layer]]
+type = "conv2d"
+name = "conv1"
+in_channels = 1
+out_channels = 2
+kernel_size = 4
+stride = 1
+relu = true
+
+[layer.weights]
+source = "inline"
+# 2 output channels * 1 input channel * 4 * 4 = 32 weights
+values = [
+    # Output channel 0
+    0.1, 0.2, 0.3, 0.4,
+    0.1, 0.2, 0.3, 0.4,
+    0.1, 0.2, 0.3, 0.4,
+    0.1, 0.2, 0.3, 0.4,
+    # Output channel 1
+    -0.1, -0.2, -0.3, -0.4,
+    -0.1, -0.2, -0.3, -0.4,
+    -0.1, -0.2, -0.3, -0.4,
+    -0.1, -0.2, -0.3, -0.4
+]
+
+[layer.bias]
+source = "inline"
+values = [0.0, 0.1]
+
+# Third layer: flatten to vector
+[[layer]]
+type = "flatten"
+name = "flatten1"
+
+# Fourth layer: linear layer to 2 outputs
+[[layer]]
+type = "linear"
+name = "fc1"
+in_features = 2  # 2 channels * 1 * 1 = 2 (after conv reduces 4x4 to 1x1)
+out_features = 2
+relu = false
+
+[layer.weights]
+source = "inline"
+# 2 outputs * 2 inputs = 4 weights
+values = [0.5, 0.5, -0.5, 0.5]
+
+[layer.bias]
+source = "inline"
+values = [0.0, 0.0]
