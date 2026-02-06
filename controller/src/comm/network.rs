@@ -11,6 +11,19 @@ use crate::error::ControllerError;
 use crate::fp16::TinyNNFP16;
 use super::TnnInterface;
 
+/// Latency configuration for receiving TNN operation results.
+///
+/// TNN operations have deterministic latency - a fixed number of cycles
+/// before the first output, and potentially fixed gaps between subsequent
+/// outputs. This struct captures those timing parameters.
+#[derive(Debug, Clone, Copy)]
+pub struct OutputLatency {
+    /// Number of padding bytes before the first FP16 result.
+    pub initial_padding: usize,
+    /// Number of padding bytes between each subsequent FP16 result.
+    pub inter_result_padding: usize,
+}
+
 /// Default port for TNN network communication.
 pub const DEFAULT_PORT: u16 = 9876;
 
@@ -94,30 +107,55 @@ impl TnnInterface for TnnNetworkClient {
     }
 }
 
-/// Helper to skip latency padding bytes (0xFF) in the output stream.
-pub fn skip_latency_padding(
-    iface: &mut impl TnnInterface,
-) -> Result<TinyNNFP16, ControllerError> {
-    loop {
-        let low = iface.recv_byte()?;
-        if low != 0xFF {
-            // This is the low byte of an FP16 value
-            let high = iface.recv_byte()?;
-            let raw = ((high as u16) << 8) | (low as u16);
-            return Ok(TinyNNFP16::from_u16(raw));
-        }
-        // Otherwise it's a latency padding byte, continue
-    }
-}
-
-/// Receive an expected number of FP16 values, skipping latency padding.
-pub fn recv_fp16_values_with_padding(
+/// Skip a known number of padding bytes.
+fn skip_padding_bytes(
     iface: &mut impl TnnInterface,
     count: usize,
+) -> Result<(), ControllerError> {
+    for _ in 0..count {
+        let _ = iface.recv_byte()?;
+    }
+    Ok(())
+}
+
+/// Read a single FP16 value (low byte first, then high byte).
+fn recv_fp16(iface: &mut impl TnnInterface) -> Result<TinyNNFP16, ControllerError> {
+    let low = iface.recv_byte()?;
+    let high = iface.recv_byte()?;
+    let raw = ((high as u16) << 8) | (low as u16);
+    Ok(TinyNNFP16::from_u16(raw))
+}
+
+/// Receive FP16 values with known latency padding.
+///
+/// This function skips the deterministic padding bytes output by TNN operations
+/// based on known latency counts, rather than trying to detect padding by byte
+/// value (which fails when valid FP16 values contain 0xFF).
+///
+/// The TNN output pattern is:
+/// - Initial padding bytes
+/// - For each result: inter-result padding bytes, then low byte, then high byte
+///
+/// # Arguments
+///
+/// * `iface` - TNN interface to receive from
+/// * `count` - Number of FP16 values to receive
+/// * `latency` - Latency configuration specifying padding byte counts
+pub fn recv_fp16_values_with_latency(
+    iface: &mut impl TnnInterface,
+    count: usize,
+    latency: OutputLatency,
 ) -> Result<Vec<TinyNNFP16>, ControllerError> {
     let mut results = Vec::with_capacity(count);
+
+    // Skip initial padding before first result
+    skip_padding_bytes(iface, latency.initial_padding)?;
+
     for _ in 0..count {
-        results.push(skip_latency_padding(iface)?);
+        // Skip inter-result padding (this comes BEFORE each result's data bytes)
+        skip_padding_bytes(iface, latency.inter_result_padding)?;
+        results.push(recv_fp16(iface)?);
     }
+
     Ok(results)
 }

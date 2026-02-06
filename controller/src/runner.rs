@@ -19,10 +19,53 @@ use std::collections::HashMap;
 use std::path::Path;
 
 use crate::cnn::{load_weights, CnnModel, DataSource, Layer, TensorShape};
-use crate::comm::{recv_fp16_values_with_padding, CommandBuffer, TnnInterface};
+use crate::comm::{recv_fp16_values_with_latency, CommandBuffer, OutputLatency, TnnInterface};
 use crate::error::ControllerError;
 use crate::fp16::TinyNNFP16;
 use crate::translation::{translate_avg_pool2d, translate_conv2d, translate_linear, translate_max_pool2d};
+
+/// TNN operation latency constants (matching model/src/network.rs).
+mod latency {
+    use super::OutputLatency;
+
+    /// Convolve: 22 cycles initial padding, then continuous output (2 bytes per result).
+    pub const CONVOLVE: OutputLatency = OutputLatency {
+        initial_padding: 22,
+        inter_result_padding: 0,
+    };
+
+    /// Accumulate: 5 + 2 cycles initial, then (count - 2) between each result.
+    pub fn accumulate(count: usize) -> OutputLatency {
+        OutputLatency {
+            initial_padding: 5 + 2,
+            inter_result_padding: count.saturating_sub(2),
+        }
+    }
+
+    /// Fixed multiply-accumulate: 6 + 2 cycles initial, then (count - 2) between results.
+    pub fn fixed_mul_acc(count: usize) -> OutputLatency {
+        OutputLatency {
+            initial_padding: 6 + 2,
+            inter_result_padding: count.saturating_sub(2),
+        }
+    }
+
+    /// Max pool: 1 + 2 cycles initial, then (count - 2) between results.
+    pub fn max_pool(count: usize) -> OutputLatency {
+        OutputLatency {
+            initial_padding: 1 + 2,
+            inter_result_padding: count.saturating_sub(2),
+        }
+    }
+
+    /// Multiply-accumulate: 6 + num_values cycles initial, single result.
+    pub fn mul_acc(num_values: usize) -> OutputLatency {
+        OutputLatency {
+            initial_padding: 6 + num_values,
+            inter_result_padding: 0,
+        }
+    }
+}
 
 /// Results from live model execution.
 ///
@@ -284,7 +327,11 @@ impl CnnRunner {
                                 interface.send_stream(&translation.convolve_streams[convolve_idx])?;
 
                                 // Receive outputs (out_pixels values)
-                                let results = recv_fp16_values_with_padding(interface, out_pixels)?;
+                                let results = recv_fp16_values_with_latency(
+                                    interface,
+                                    out_pixels,
+                                    latency::CONVOLVE,
+                                )?;
                                 all_partials[out_ch].extend(results);
 
                                 convolve_idx += 1;
@@ -314,7 +361,11 @@ impl CnnRunner {
                         interface.send_stream(&accum_stream)?;
 
                         // Receive accumulated results
-                        let results = recv_fp16_values_with_padding(interface, out_pixels)?;
+                        let results = recv_fp16_values_with_latency(
+                            interface,
+                            out_pixels,
+                            latency::accumulate(partials_per_pixel),
+                        )?;
                         channel_outputs.extend(results);
                     }
 
@@ -329,11 +380,18 @@ impl CnnRunner {
                     let streams =
                         translate_linear(linear, &current_activations, &weights, &bias)?;
 
+                    // Each mul_acc receives in_features pairs (2 values each)
+                    let num_values = linear.in_features * 2;
+
                     let mut outputs = Vec::with_capacity(linear.out_features);
                     for stream in &streams {
                         interface.send_stream(stream)?;
                         // Each mul_acc produces exactly 1 output
-                        let result = recv_fp16_values_with_padding(interface, 1)?;
+                        let result = recv_fp16_values_with_latency(
+                            interface,
+                            1,
+                            latency::mul_acc(num_values),
+                        )?;
                         outputs.extend(result);
                     }
 
@@ -350,7 +408,13 @@ impl CnnRunner {
                     interface.send_stream(&stream)?;
 
                     out_shape = current_shape.after_pool(pool.kernel_size, pool.stride);
-                    let results = recv_fp16_values_with_padding(interface, out_shape.size())?;
+                    // max_pool count is kernel_size^2 (pooling window elements)
+                    let pool_count = pool.kernel_size * pool.kernel_size;
+                    let results = recv_fp16_values_with_latency(
+                        interface,
+                        out_shape.size(),
+                        latency::max_pool(pool_count),
+                    )?;
                     current_activations = results;
                 }
 
@@ -361,7 +425,13 @@ impl CnnRunner {
                     interface.send_stream(&stream)?;
 
                     out_shape = current_shape.after_pool(pool.kernel_size, pool.stride);
-                    let results = recv_fp16_values_with_padding(interface, out_shape.size())?;
+                    // fixed_mul_acc count is kernel_size^2 (pooling window elements)
+                    let pool_count = pool.kernel_size * pool.kernel_size;
+                    let results = recv_fp16_values_with_latency(
+                        interface,
+                        out_shape.size(),
+                        latency::fixed_mul_acc(pool_count),
+                    )?;
                     current_activations = results;
                 }
 

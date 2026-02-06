@@ -124,7 +124,6 @@ pub fn do_fixed_mul_acc(
     for v in in_values {
         let mul_result = *v * param;
         cur_mul_acc = cur_mul_acc + mul_result;
-
         cur_value_idx += 1;
 
         if cur_value_idx == value_per_mul_acc {

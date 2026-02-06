@@ -63,7 +63,7 @@ pub mod translation;
 
 pub use cnn::{load_hex_file, load_model, CnnModel, TensorShape};
 pub use comm::{write_fp16_vec, CommandBuffer, TnnInterface, TnnNetworkClient};
-pub use comm::{recv_fp16_values_with_padding, skip_latency_padding};
+pub use comm::{recv_fp16_values_with_latency, OutputLatency};
 pub use error::ControllerError;
 pub use fp16::TinyNNFP16;
 pub use io::{read_input_json, write_output_json, JsonInput, JsonOutput};
