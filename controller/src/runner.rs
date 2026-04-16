@@ -323,16 +323,39 @@ impl CnnRunner {
                     for out_ch in 0..conv.out_channels {
                         for _in_ch in 0..conv.in_channels {
                             for _tile in 0..tiles_per_kernel {
+
                                 // Send convolve command
                                 interface.send_stream(&translation.convolve_streams[convolve_idx])?;
 
-                                // Receive outputs (out_pixels values)
-                                let results = recv_fp16_values_with_latency(
+                                // TNN's sliding 4x2 buffer bleeds across row boundaries:
+                                // between each pair of output rows the window produces
+                                // (CONV_WIDTH-1) = 3 garbage outputs before valid data
+                                // resumes. Receive all outputs and discard the garbage.
+                                let garbage_per_transition = crate::tnn_ops::CONV_WIDTH - 1;
+                                let total_results = out_pixels + garbage_per_transition * (out_h - 1);
+
+                                let all_tnn_results = recv_fp16_values_with_latency(
                                     interface,
-                                    out_pixels,
+                                    total_results,
                                     latency::CONVOLVE,
                                 )?;
-                                all_partials[out_ch].extend(results);
+
+                                // Extract valid results: each row contributes out_w values,
+                                // followed by garbage_per_transition values (except the last row).
+                                let mut idx = 0;
+                                let mut valid_results = Vec::with_capacity(out_pixels);
+                                for row in 0..out_h {
+                                    for _ in 0..out_w {
+                                        valid_results.push(all_tnn_results[idx]);
+                                        idx += 1;
+                                    }
+                                    if row < out_h - 1 {
+                                        idx += garbage_per_transition;
+                                    }
+                                }
+
+                                all_partials[out_ch].extend(valid_results);
+
 
                                 convolve_idx += 1;
                             }

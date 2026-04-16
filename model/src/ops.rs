@@ -50,6 +50,7 @@ pub fn do_convolve(in_values: &Vec<TinyNNFP16>, params: &Array2<TinyNNFP16>) -> 
             active_values[[ConvWidth - 1, y]] = in_values[n + y];
         }
 
+
         let multiply = &active_values * params;
 
         out_values.push(sum_values(multiply.slice(s![.., ..])));

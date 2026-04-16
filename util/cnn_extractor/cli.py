@@ -176,68 +176,68 @@ Examples:
 
     parsed_args = parser.parse_args(args)
 
-    try:
-        # Load the model class
-        model_class = load_model_class(parsed_args.module_path, parsed_args.class_name)
+    #try:
+    # Load the model class
+    model_class = load_model_class(parsed_args.module_path, parsed_args.class_name)
 
-        # Instantiate the model
-        model = model_class()
+    # Instantiate the model
+    model = model_class()
 
-        # Load checkpoint if provided
-        if parsed_args.checkpoint:
-            model = load_checkpoint(model, parsed_args.checkpoint)
-            model.eval()  # Set to evaluation mode
+    # Load checkpoint if provided
+    if parsed_args.checkpoint:
+        model = load_checkpoint(model, parsed_args.checkpoint)
+        model.eval()  # Set to evaluation mode
 
-        # Parse input shape
-        input_shape = parse_input_shape(parsed_args.input_shape)
+    # Parse input shape
+    input_shape = parse_input_shape(parsed_args.input_shape)
 
-        # Create extractor
-        extractor = CNNExtractor(model, input_shape)
+    # Create extractor
+    extractor = CNNExtractor(model, input_shape)
 
-        if parsed_args.validate_only:
-            # Validate only
-            warnings = extractor.validate_only()
-            print(f"Validation successful: {parsed_args.class_name}")
-            for warning in warnings:
-                print(f"Warning: {warning}")
-            return 0
-
-        # Generate TOML
-        name = parsed_args.name or parsed_args.class_name
-
-        if parsed_args.output:
-            # Save to file
-            extractor.save_toml(
-                path=parsed_args.output,
-                name=name,
-                description=parsed_args.description,
-                output_size=parsed_args.output_size,
-                weights_format=parsed_args.weights_format,
-                output_dir=parsed_args.weights_dir,
-            )
-            print(f"Saved to {parsed_args.output}")
-        else:
-            # Print to stdout
-            toml_content = extractor.to_toml(
-                name=name,
-                description=parsed_args.description,
-                output_size=parsed_args.output_size,
-                weights_format=parsed_args.weights_format,
-                output_dir=parsed_args.weights_dir,
-            )
-            print(toml_content)
-
+    if parsed_args.validate_only:
+        # Validate only
+        warnings = extractor.validate_only()
+        print(f"Validation successful: {parsed_args.class_name}")
+        for warning in warnings:
+            print(f"Warning: {warning}")
         return 0
 
-    except ExtractionError as e:
-        print(f"Error: {e}", file=sys.stderr)
-        return 1
-    except ImportError as e:
-        print(f"Import error: {e}", file=sys.stderr)
-        return 1
-    except Exception as e:
-        print(f"Unexpected error: {e}", file=sys.stderr)
-        return 1
+    # Generate TOML
+    name = parsed_args.name or parsed_args.class_name
+
+    if parsed_args.output:
+        # Save to file
+        extractor.save_toml(
+            path=parsed_args.output,
+            name=name,
+            description=parsed_args.description,
+            output_size=parsed_args.output_size,
+            weights_format=parsed_args.weights_format,
+            output_dir=parsed_args.weights_dir,
+        )
+        print(f"Saved to {parsed_args.output}")
+    else:
+        # Print to stdout
+        toml_content = extractor.to_toml(
+            name=name,
+            description=parsed_args.description,
+            output_size=parsed_args.output_size,
+            weights_format=parsed_args.weights_format,
+            output_dir=parsed_args.weights_dir,
+        )
+        print(toml_content)
+
+    return 0
+
+    #except ExtractionError as e:
+    #    print(f"Error: {e}", file=sys.stderr)
+    #    return 1
+    #except ImportError as e:
+    #    print(f"Import error: {e}", file=sys.stderr)
+    #    return 1
+    #except Exception as e:
+    #    print(f"Unexpected error: {e}", file=sys.stderr)
+    #    return 1
 
 
 if __name__ == "__main__":
