@@ -192,10 +192,10 @@ def compare_outputs(pytorch_out, tnn_out, tolerance):
 
     if mismatches:
         print(f"\nMismatches ({len(mismatches)} values exceed tolerance):")
-        for i, pt_val, tnn_val, diff in mismatches[:10]:  # Show first 10
+        for i, pt_val, tnn_val, diff in mismatches:
             print(f"  [{i}]: PyTorch={pt_val:.6f}, TNN={tnn_val:.6f}, diff={diff:.6f}")
-        if len(mismatches) > 10:
-            print(f"  ... and {len(mismatches) - 10} more")
+        #if len(mismatches) > 10:
+        #    print(f"  ... and {len(mismatches) - 10} more")
         return False
 
     print("\nAll values within tolerance!")
