@@ -10,11 +10,13 @@ This script:
 5. Compares output with TNN results
 
 Usage:
-    python pytorch_compare.py model.toml input.json tnn_output.json [--tolerance 0.01]
+    python pytorch_compare.py model.toml input.json tnn_output.json [--max-ulps 4]
 """
 
 import argparse
 import json
+import math
+import struct
 import sys
 from pathlib import Path
 
@@ -170,32 +172,59 @@ def run_pytorch(model, input_data, input_shape):
         return output.numpy().flatten()
 
 
-def compare_outputs(pytorch_out, tnn_out, tolerance):
-    """Compare PyTorch and TNN outputs."""
+def float_to_bf16_bits(f):
+    """Get BF16 bit pattern by truncating the low 16 bits of float32."""
+    if math.isnan(f):
+        return 0x7FC0
+    bits32 = struct.unpack('>I', struct.pack('>f', float(f)))[0]
+    return (bits32 >> 16) & 0xFFFF
+
+
+def bf16_ulp_distance(a, b):
+    """ULP distance between two values measured in BF16 (1-8-7) space."""
+    if math.isnan(a) or math.isnan(b):
+        return float('inf')
+    if math.isinf(a) and math.isinf(b):
+        return 0 if a == b else float('inf')
+    if math.isinf(a) or math.isinf(b):
+        return float('inf')
+
+    def to_ordered(bits):
+        # Map sign-magnitude BF16 to a linearly ordered integer.
+        # Negative values (bit 15 set) map to <= 0; positive to >= 0.
+        # -0 and +0 both map to 0.
+        if bits >= 0x8000:
+            return 0x8000 - bits
+        return bits
+
+    return abs(to_ordered(float_to_bf16_bits(a)) - to_ordered(float_to_bf16_bits(b)))
+
+
+def compare_outputs(pytorch_out, tnn_out, max_ulps):
+    """Compare PyTorch and TNN outputs using BF16 ULP distance."""
     if len(pytorch_out) != len(tnn_out):
         print(f"ERROR: Output size mismatch! PyTorch: {len(pytorch_out)}, TNN: {len(tnn_out)}")
         return False
 
-    max_diff = 0.0
+    max_ulp_seen = 0
     mismatches = []
 
     for i, (pt_val, tnn_val) in enumerate(zip(pytorch_out, tnn_out)):
-        diff = abs(pt_val - tnn_val)
-        max_diff = max(max_diff, diff)
+        ulps = bf16_ulp_distance(float(pt_val), float(tnn_val))
+        if ulps > max_ulp_seen:
+            max_ulp_seen = ulps
 
-        if diff > tolerance:
-            mismatches.append((i, pt_val, tnn_val, diff))
+        if ulps > max_ulps:
+            mismatches.append((i, pt_val, tnn_val, ulps))
 
     print(f"Output size: {len(pytorch_out)}")
-    print(f"Max difference: {max_diff:.6f}")
-    print(f"Tolerance: {tolerance}")
+    print(f"Max ULP difference (BF16): {max_ulp_seen}")
+    print(f"Allowed max ULPs: {max_ulps}")
 
     if mismatches:
-        print(f"\nMismatches ({len(mismatches)} values exceed tolerance):")
-        for i, pt_val, tnn_val, diff in mismatches:
-            print(f"  [{i}]: PyTorch={pt_val:.6f}, TNN={tnn_val:.6f}, diff={diff:.6f}")
-        #if len(mismatches) > 10:
-        #    print(f"  ... and {len(mismatches) - 10} more")
+        print(f"\nMismatches ({len(mismatches)} values exceed {max_ulps} ULPs):")
+        for i, pt_val, tnn_val, ulps in mismatches:
+            print(f"  [{i}]: PyTorch={pt_val:.6f}, TNN={tnn_val:.6f}, ULPs={ulps}")
         return False
 
     print("\nAll values within tolerance!")
@@ -210,8 +239,8 @@ def main():
     parser.add_argument('input', help='Path to input JSON file')
     parser.add_argument('tnn_output', help='Path to TNN output JSON file')
     parser.add_argument(
-        '--tolerance', type=float, default=0.01,
-        help='Maximum allowed difference per output value (default: 0.01)'
+        '--max-ulps', type=int, default=4,
+        help='Maximum allowed BF16 ULP distance per output value (default: 4)'
     )
     parser.add_argument(
         '--verbose', '-v', action='store_true',
@@ -256,7 +285,7 @@ def main():
         print()
 
     # Compare
-    success = compare_outputs(pytorch_output, tnn_output, args.tolerance)
+    success = compare_outputs(pytorch_output, tnn_output, args.max_ulps)
     sys.exit(0 if success else 1)
 
 
