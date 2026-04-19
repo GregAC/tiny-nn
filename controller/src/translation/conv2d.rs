@@ -108,7 +108,7 @@ fn extract_conv_row(
     for x in start_x..end_x {
         for inner_y in 0..CONV_HEIGHT {
             let actual_y = y + inner_y;
-            if actual_y < height {
+            if actual_y < height && x < width {
                 values.push(image[actual_y * width + x]);
             } else {
                 values.push(TinyNNFP16::zero());
@@ -129,12 +129,17 @@ fn conv_input_stream_for_channel(
     tile_y_offset: usize,
 ) -> Vec<TinyNNFP16> {
     let conv_result_height = height - (kernel_size - 1);
+    // When kernel_size is not a multiple of CONV_WIDTH, the last valid output pixel
+    // requires image columns beyond `width`. Pad each row with zeros so the sliding
+    // window can reach all out_width output positions.
+    let extra_cols = (CONV_WIDTH - kernel_size % CONV_WIDTH) % CONV_WIDTH;
+    let padded_width = width + extra_cols;
     let mut stream = Vec::new();
 
     for out_y in 0..conv_result_height {
         // The actual y in the image for this output row, accounting for tile offset
         let y = out_y + tile_y_offset;
-        let row = extract_conv_row(image, width, height, 0, width, y);
+        let row = extract_conv_row(image, width, height, 0, padded_width, y);
         stream.extend(row);
     }
 
