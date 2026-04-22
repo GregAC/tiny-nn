@@ -19,7 +19,8 @@ use std::collections::HashMap;
 use std::path::Path;
 
 use crate::cnn::{load_weights, CnnModel, DataSource, Layer, TensorShape};
-use crate::comm::{recv_fp16_values_with_latency, CommandBuffer, OutputLatency, TnnInterface};
+use crate::comm::{drain_to_idle, recv_fp16_values_with_latency, CommandBuffer, OutputLatency, TnnInterface};
+use crate::tnn_ops::{ACCUMULATE_IDLE_DRAIN, CONVOLVE_IDLE_DRAIN, FIXED_MUL_ACC_IDLE_DRAIN, MAX_POOL_IDLE_DRAIN, MUL_ACC_IDLE_DRAIN};
 use crate::error::ControllerError;
 use crate::fp16::TinyNNFP16;
 use crate::translation::{translate_avg_pool2d, translate_conv2d, translate_linear, translate_max_pool2d};
@@ -339,6 +340,7 @@ impl CnnRunner {
                                     total_results,
                                     latency::CONVOLVE,
                                 )?;
+                                drain_to_idle(interface, CONVOLVE_IDLE_DRAIN)?;
 
                                 // Extract valid results: each row contributes out_w values,
                                 // followed by garbage_per_transition values (except the last row).
@@ -389,6 +391,7 @@ impl CnnRunner {
                             out_pixels,
                             latency::accumulate(partials_per_pixel),
                         )?;
+                        drain_to_idle(interface, ACCUMULATE_IDLE_DRAIN)?;
                         channel_outputs.extend(results);
                     }
 
@@ -415,6 +418,7 @@ impl CnnRunner {
                             1,
                             latency::mul_acc(num_values),
                         )?;
+                        drain_to_idle(interface, MUL_ACC_IDLE_DRAIN)?;
                         outputs.extend(result);
                     }
 
@@ -438,6 +442,7 @@ impl CnnRunner {
                         out_shape.size(),
                         latency::max_pool(pool_count),
                     )?;
+                    drain_to_idle(interface, MAX_POOL_IDLE_DRAIN)?;
                     current_activations = results;
                 }
 
@@ -455,6 +460,7 @@ impl CnnRunner {
                         out_shape.size(),
                         latency::fixed_mul_acc(pool_count),
                     )?;
+                    drain_to_idle(interface, FIXED_MUL_ACC_IDLE_DRAIN)?;
                     current_activations = results;
                 }
 

@@ -61,6 +61,17 @@ pub const MAX_POOL_FIRST_OUTPUT_DELAY: usize = 1;
 /// Cycles from command word to output for mul_acc.
 pub const MUL_ACC_OUTPUT_DELAY: usize = 6;
 
+/// Zero words to send after convolve NaN so FSM returns to idle (5 drain + 1 idle).
+pub const CONVOLVE_IDLE_DRAIN: usize = 6;
+/// Zero words to send after accumulate NaN so FSM returns to idle (3 drain + 1 idle).
+pub const ACCUMULATE_IDLE_DRAIN: usize = 4;
+/// Zero words to send after mul_acc NaN so FSM returns to idle (4 drain + 1 idle).
+pub const MUL_ACC_IDLE_DRAIN: usize = 5;
+/// Zero words to send after fixed_mul_acc NaN so FSM returns to idle (4 drain + 1 idle).
+pub const FIXED_MUL_ACC_IDLE_DRAIN: usize = 5;
+/// Zero words to send after max_pool NaN so FSM returns to idle (1 drain + 1 idle).
+pub const MAX_POOL_IDLE_DRAIN: usize = 2;
+
 /// Build a convolve command stream.
 ///
 /// The convolve operation performs a 4x2 kernel convolution over streaming data.

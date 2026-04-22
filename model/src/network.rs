@@ -325,7 +325,9 @@ where
                 }
             }
 
-            _ => {}
+            _ => {
+                (self.output_callback)(0xFF);
+            }
         }
     }
 

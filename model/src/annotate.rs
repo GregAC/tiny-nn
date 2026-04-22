@@ -183,8 +183,9 @@ fn build_output_validity_map(sent_words: &[u16]) -> Vec<bool> {
                 }
             }
             _ => {
-                eprintln!("Warning: unknown opcode 0x{:X} at word index {}", opcode, i - 1);
-                break;
+                // Drain/idle words (e.g. 0x0000 padding between operations) produce
+                // one 0xFF output byte which is not valid data.
+                validity.push(false);
             }
         }
     }

@@ -59,5 +59,4 @@ pub enum Commands {
         output: PathBuf,
     },
 
-    FooFP,
 }

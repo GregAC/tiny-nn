@@ -107,6 +107,23 @@ impl TnnInterface for TnnNetworkClient {
     }
 }
 
+/// Drain the TNN FSM back to idle after an operation completes.
+///
+/// Sends `drain_words` zero words (consumed by the ExecEnd drain states and
+/// one idle cycle), then reads back the corresponding 0xFF output bytes.
+/// This must be called after receiving all output for an operation and before
+/// sending the next operation's command word.
+pub fn drain_to_idle(
+    iface: &mut impl TnnInterface,
+    drain_words: usize,
+) -> Result<(), ControllerError> {
+    for _ in 0..drain_words {
+        iface.send_word(0)?;
+    }
+    skip_padding_bytes(iface, drain_words)?;
+    Ok(())
+}
+
 /// Skip a known number of padding bytes.
 fn skip_padding_bytes(
     iface: &mut impl TnnInterface,
