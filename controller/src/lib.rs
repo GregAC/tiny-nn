@@ -62,7 +62,7 @@ pub mod tnn_ops;
 pub mod translation;
 
 pub use cnn::{load_hex_file, load_model, CnnModel, TensorShape};
-pub use comm::{write_fp16_vec, CommandBuffer, TnnInterface, TnnNetworkClient};
+pub use comm::{write_bytes_hex_file, write_fp16_vec, CommandBuffer, HexFileWriter, RecordingInterface, TnnInterface, TnnNetworkClient};
 pub use comm::{recv_fp16_values_with_latency, OutputLatency};
 pub use error::ControllerError;
 pub use fp16::TinyNNFP16;

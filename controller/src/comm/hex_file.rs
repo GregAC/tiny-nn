@@ -161,6 +161,34 @@ pub fn write_fp16_vec<P: AsRef<Path>>(
     writer.flush()
 }
 
+/// Write a slice of raw bytes to a hex file, one byte per line as 2-char hex.
+///
+/// # Arguments
+///
+/// * `bytes` - Bytes to write
+/// * `path` - Path to the output file
+pub fn write_bytes_hex_file<P: AsRef<Path>>(
+    bytes: &[u8],
+    path: P,
+) -> Result<(), ControllerError> {
+    let file = File::create(path.as_ref()).map_err(|e| {
+        ControllerError::IoError(format!(
+            "Failed to create hex file {}: {}",
+            path.as_ref().display(),
+            e
+        ))
+    })?;
+    let mut writer = BufWriter::new(file);
+    for &b in bytes {
+        writeln!(writer, "{:02x}", b).map_err(|e| {
+            ControllerError::IoError(format!("Failed to write hex: {}", e))
+        })?;
+    }
+    writer.flush().map_err(|e| {
+        ControllerError::IoError(format!("Failed to flush: {}", e))
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

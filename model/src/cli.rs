@@ -43,4 +43,21 @@ pub enum Commands {
         #[arg(long, default_value = "127.0.0.1")]
         host: String,
     },
+
+    /// Annotate recorded received bytes with latency X markers
+    AnnotateReceived {
+        /// Path to recorded sent.hex (16-bit command words, one per line)
+        #[arg(short, long)]
+        sent: PathBuf,
+
+        /// Path to recorded received.hex (raw bytes, one per line)
+        #[arg(short, long)]
+        received: PathBuf,
+
+        /// Output path for annotated hex file
+        #[arg(short, long)]
+        output: PathBuf,
+    },
+
+    FooFP,
 }

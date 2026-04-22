@@ -3,8 +3,9 @@ use std::path::PathBuf;
 use clap::{Parser, Subcommand};
 
 use controller::{
-    load_hex_file, load_model, plan_execution, read_input_json, write_fp16_vec,
-    write_output_json, CnnRunner, LayerPlan, TnnNetworkClient,
+    load_hex_file, load_model, plan_execution, read_input_json, write_bytes_hex_file,
+    write_fp16_vec, write_output_json, CnnRunner, HexFileWriter, LayerPlan,
+    RecordingInterface, TnnNetworkClient,
 };
 
 #[derive(Parser)]
@@ -53,6 +54,10 @@ enum Commands {
         /// Include intermediate layer outputs
         #[arg(long)]
         intermediate: bool,
+
+        /// Directory to write recording files (sent.hex, received.hex)
+        #[arg(long)]
+        record_dir: Option<PathBuf>,
     },
 
     /// Show execution plan for a model
@@ -127,6 +132,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             output,
             host,
             intermediate,
+            record_dir,
         } => {
             println!("Loading model from: {}", model.display());
             let cnn_model = load_model(&model)?;
@@ -147,10 +153,36 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let runner = CnnRunner::new(cnn_model, base_path);
 
             println!("\nConnecting to TNN server at {}...", host);
-            let mut interface = TnnNetworkClient::connect(&host)?;
+            let client = TnnNetworkClient::connect(&host)?;
 
             println!("Running model...");
-            let results = runner.run(&input_data, &mut interface, intermediate)?;
+            let results = if record_dir.is_some() {
+                let mut recording = RecordingInterface::new(client);
+                let results = runner.run(&input_data, &mut recording, intermediate)?;
+                if let Some(ref dir) = record_dir {
+                    std::fs::create_dir_all(dir)?;
+                    let sent_path = dir.join("sent.hex");
+                    let mut writer = HexFileWriter::new(&sent_path)?;
+                    writer.write_stream(recording.sent_words())?;
+                    writer.flush()?;
+                    println!(
+                        "Wrote {} sent words to: {}",
+                        recording.sent_words().len(),
+                        sent_path.display()
+                    );
+                    let recv_path = dir.join("received.hex");
+                    write_bytes_hex_file(recording.received_bytes(), &recv_path)?;
+                    println!(
+                        "Wrote {} received bytes to: {}",
+                        recording.received_bytes().len(),
+                        recv_path.display()
+                    );
+                }
+                results
+            } else {
+                let mut interface = client;
+                runner.run(&input_data, &mut interface, intermediate)?
+            };
 
             println!("Got {} output values", results.final_output.len());
             if intermediate {

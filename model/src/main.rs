@@ -1,3 +1,4 @@
+mod annotate;
 mod cli;
 mod config;
 mod executor;
@@ -12,6 +13,7 @@ mod utils;
 use clap::Parser;
 use std::path::Path;
 
+use annotate::annotate_received;
 use cli::{Cli, Commands};
 use config::load_config;
 use executor::execute_operation;
@@ -31,6 +33,9 @@ fn main() {
         }
         Commands::Serve { port, host } => {
             run_server(&host, port);
+        }
+        Commands::AnnotateReceived { sent, received, output } => {
+            annotate_received(&sent, &received, &output);
         }
     }
 }
